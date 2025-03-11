@@ -30,6 +30,18 @@ import StakePage from './pages/StakePage'
 import GovernancePage from './pages/GovernancePage'
 
 function App() {
+  // Set up network and wallet configuration
+  const network = WalletAdapterNetwork.Devnet
+  const endpoint = useMemo(() => clusterApiUrl(network), [network])
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new LedgerWalletAdapter()
+    ],
+    []
+  )
+
   
 }
 
