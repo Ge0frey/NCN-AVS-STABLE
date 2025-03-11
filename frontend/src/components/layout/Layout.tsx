@@ -21,7 +21,12 @@ export default function Layout({ children }: LayoutProps) {
   const showSidebar = !isPublicRoute;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+    <div className="flex h-screen overflow-hidden bg-slate-900 grid-background relative">
+      {/* Decorative glowing orbs */}
+      <div className="glow-orb glow-orb-blue w-96 h-96 top-0 right-0"></div>
+      <div className="glow-orb glow-orb-purple w-96 h-96 bottom-0 left-0"></div>
+      <div className="glow-orb glow-orb-orange w-64 h-64 top-1/2 left-1/3 -translate-y-1/2"></div>
+      
       {/* Sidebar */}
       {showSidebar && (
         <Sidebar 
@@ -31,7 +36,7 @@ export default function Layout({ children }: LayoutProps) {
       )}
       
       {/* Main content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden relative z-10">
         {/* Header */}
         <Header 
           onMenuClick={() => setSidebarOpen(true)} 
