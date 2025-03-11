@@ -44,7 +44,7 @@ export default function ConnectPage() {
   const walletOptions = [
     {
       name: 'Phantom',
-      icon: 'https://www.phantom.app/img/logo.png',
+      icon: 'https://play-lh.googleusercontent.com/obRvW02OTYLzJuvic1ZbVDVXLXzI0Vt_JGOjlxZ92XMdBF_i3kqU92u9SgHvJ5pySdM=w240-h480-rw',
       description: 'Connect to your Phantom Wallet',
     },
     {
@@ -54,12 +54,12 @@ export default function ConnectPage() {
     },
     {
       name: 'Backpack',
-      icon: 'https://backpack.app/assets/backpack-logo.svg',
+      icon: 'https://play-lh.googleusercontent.com/EhgMPJGUYrA7-8PNfOdZgVGzxrOw4toX8tQXv-YzIvN6sAMYFunQ55MVo2SS_hLiNm8=w240-h480-rw',
       description: 'Connect to your Backpack Wallet',
     },
     {
       name: 'Ledger',
-      icon: 'https://cdn.jsdelivr.net/gh/solana-labs/wallet-adapter@master/packages/wallets/icons/ledger.svg',
+      icon: 'https://cdn.prod.website-files.com/60f008ba9757da0940af288e/60fbcaf3bd0478862b605203_ledger.jpg',
       description: 'Connect to your Ledger Hardware Wallet',
     },
   ];
