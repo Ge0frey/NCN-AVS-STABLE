@@ -15,14 +15,14 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
   const location = useLocation();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-700 dark:bg-slate-800/90">
+    <header className="sticky top-0 z-30 glass-panel border-b border-slate-700/50">
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Menu button (mobile) & Logo */}
         <div className="flex items-center">
           {showMenuButton && (
             <button
               type="button"
-              className="mr-4 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300 md:hidden"
+              className="mr-4 rounded-md p-2 text-slate-300 hover:text-blue-400 transition-colors"
               onClick={onMenuClick}
               aria-label="Open menu"
             >
@@ -33,7 +33,7 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
           )}
           
           <Link to="/" className="flex items-center">
-            <span className="text-xl font-bold text-sky-500 dark:text-sky-400">STABLE-FUNDS</span>
+            <span className="text-xl font-bold gradient-text">STABLE-FUNDS</span>
           </Link>
         </div>
 
@@ -44,10 +44,10 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               <li>
                 <Link 
                   to="/dashboard" 
-                  className={`px-3 py-2 text-sm font-medium ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     location.pathname === '/dashboard' 
-                      ? 'text-sky-600 dark:text-sky-400' 
-                      : 'text-slate-600 hover:text-sky-500 dark:text-slate-300 dark:hover:text-sky-400'
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
                   }`}
                 >
                   Dashboard
@@ -56,10 +56,10 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               <li>
                 <Link 
                   to="/stablecoins" 
-                  className={`px-3 py-2 text-sm font-medium ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     location.pathname.startsWith('/stablecoins') 
-                      ? 'text-sky-600 dark:text-sky-400' 
-                      : 'text-slate-600 hover:text-sky-500 dark:text-slate-300 dark:hover:text-sky-400'
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
                   }`}
                 >
                   Stablecoins
@@ -68,10 +68,10 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               <li>
                 <Link 
                   to="/collateral" 
-                  className={`px-3 py-2 text-sm font-medium ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     location.pathname.startsWith('/collateral') 
-                      ? 'text-sky-600 dark:text-sky-400' 
-                      : 'text-slate-600 hover:text-sky-500 dark:text-slate-300 dark:hover:text-sky-400'
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
                   }`}
                 >
                   Collateral
@@ -80,10 +80,10 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               <li>
                 <Link 
                   to="/stake" 
-                  className={`px-3 py-2 text-sm font-medium ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     location.pathname === '/stake' 
-                      ? 'text-sky-600 dark:text-sky-400' 
-                      : 'text-slate-600 hover:text-sky-500 dark:text-slate-300 dark:hover:text-sky-400'
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
                   }`}
                 >
                   Stake
@@ -92,10 +92,10 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               <li>
                 <Link 
                   to="/governance" 
-                  className={`px-3 py-2 text-sm font-medium ${
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
                     location.pathname === '/governance' 
-                      ? 'text-sky-600 dark:text-sky-400' 
-                      : 'text-slate-600 hover:text-sky-500 dark:text-slate-300 dark:hover:text-sky-400'
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
                   }`}
                 >
                   Governance
@@ -111,7 +111,7 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+            className="rounded-md p-2 text-slate-300 hover:text-blue-400 transition-colors"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark' ? (
@@ -130,18 +130,20 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
 
           {/* Balance (if connected) */}
           {connected && (
-            <div className="hidden rounded-md bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-800 dark:bg-slate-700 dark:text-slate-200 sm:block">
-              {isLoading ? (
-                <span className="flex items-center">
-                  <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Loading...
-                </span>
-              ) : (
-                <span>{balance.toFixed(4)} SOL</span>
-              )}
+            <div className="hidden sm:block">
+              <div className="gradient-border rounded-md px-3 py-1.5 text-sm font-medium bg-slate-800/50 backdrop-blur-sm">
+                {isLoading ? (
+                  <span className="flex items-center">
+                    <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  <span className="gradient-text font-bold">{balance.toFixed(4)} SOL</span>
+                )}
+              </div>
             </div>
           )}
         </div>
