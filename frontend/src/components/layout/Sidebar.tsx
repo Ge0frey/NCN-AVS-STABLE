@@ -82,8 +82,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     )},
   ];
 
-  // Determine active state for nested routes
-  const isActive = (path: string) => {
+  // Check if a route is active (including nested routes)
+  const checkIsActive = (path: string) => {
     if (path === '/dashboard') {
       return location.pathname === path;
     }
@@ -131,9 +131,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <li key={item.path}>
                 <NavLink
                   to={item.path}
-                  className={({ isActive }) => `
+                  className={({ isActive: linkIsActive }) => `
                     flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors
-                    ${isActive || isActive(item.path)
+                    ${linkIsActive || (!linkIsActive && checkIsActive(item.path))
                       ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400'
                       : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/50 dark:hover:text-slate-200'
                     }
