@@ -2,7 +2,6 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { useWalletContext } from '../../context/WalletContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,16 +10,15 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
-  const { connected } = useWalletContext();
-  
+
   // Close sidebar on route change (mobile)
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Determine if we should show the sidebar based on the route
+  // Show sidebar on all routes except home and connect
   const isPublicRoute = ['/connect', '/'].includes(location.pathname);
-  const showSidebar = connected && !isPublicRoute;
+  const showSidebar = !isPublicRoute;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
