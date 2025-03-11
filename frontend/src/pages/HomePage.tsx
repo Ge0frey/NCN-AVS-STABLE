@@ -1,10 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import Logo from '../components/layout/Logo';
+import { useEffect, useState } from 'react';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { connected } = useWalletContext();
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   const handleGetStarted = () => {
     if (connected) {
@@ -16,35 +22,88 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Hero Section */}
-      <section className="relative flex flex-col items-center justify-center overflow-hidden py-20 md:py-32">
-        {/* Decorative elements */}
-        <div className="glow-orb glow-orb-blue w-96 h-96 top-20 right-10 opacity-40"></div>
-        <div className="glow-orb glow-orb-purple w-80 h-80 bottom-10 left-10 opacity-40"></div>
+      {/* Enhanced Hero Section */}
+      <section className="relative flex min-h-[90vh] flex-col items-center justify-center overflow-hidden py-10 md:py-20">
+        {/* Animated background elements */}
+        <div className="glow-orb glow-orb-blue w-[500px] h-[500px] top-0 right-0 opacity-60 animate-pulse"></div>
+        <div className="glow-orb glow-orb-purple w-[400px] h-[400px] bottom-20 left-20 opacity-50 animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="glow-orb glow-orb-orange w-[300px] h-[300px] top-40 left-10 opacity-40 animate-pulse" style={{animationDelay: '2s'}}></div>
         
-        <div className="container mx-auto px-4 text-center relative z-10">
-          <div className="flex justify-center mb-6">
-            <Logo className="scale-150" />
+        {/* Floating particles effect */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute h-2 w-2 rounded-full bg-blue-500/50 top-[20%] left-[15%] animate-pulse"></div>
+          <div className="absolute h-2 w-2 rounded-full bg-purple-500/50 top-[30%] left-[65%] animate-pulse" style={{animationDelay: '0.5s'}}></div>
+          <div className="absolute h-2 w-2 rounded-full bg-orange-500/50 top-[70%] left-[25%] animate-pulse" style={{animationDelay: '1s'}}></div>
+          <div className="absolute h-2 w-2 rounded-full bg-blue-500/50 top-[50%] left-[80%] animate-pulse" style={{animationDelay: '1.5s'}}></div>
+          <div className="absolute h-2 w-2 rounded-full bg-purple-500/50 top-[85%] left-[50%] animate-pulse" style={{animationDelay: '2s'}}></div>
+          <div className="absolute h-3 w-3 rounded-full bg-blue-500/30 top-[40%] left-[30%] animate-pulse" style={{animationDelay: '0.7s'}}></div>
+          <div className="absolute h-3 w-3 rounded-full bg-purple-500/30 top-[60%] left-[70%] animate-pulse" style={{animationDelay: '1.2s'}}></div>
+          <div className="absolute h-3 w-3 rounded-full bg-orange-500/30 top-[25%] left-[55%] animate-pulse" style={{animationDelay: '1.7s'}}></div>
+        </div>
+        
+        <div className={`container mx-auto px-4 text-center relative z-10 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div className="flex justify-center mb-8">
+            <div className="relative">
+              <Logo className="scale-[2] animate-pulse" />
+              <div className="absolute -inset-4 rounded-full border border-blue-500/20 animate-ping"></div>
+            </div>
           </div>
-          <p className="mx-auto mb-8 max-w-2xl text-xl text-slate-300 md:text-2xl">
+          
+          <h1 className={`mb-6 text-5xl font-extrabold leading-tight transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+            <span className="bg-gradient-to-r from-blue-400 via-purple-500 to-orange-400 bg-clip-text text-transparent">
+              The Future of Stablecoins is Here
+            </span>
+          </h1>
+          
+          <p className={`mx-auto mb-10 max-w-2xl text-xl text-slate-300 md:text-2xl transition-all duration-1000 delay-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             The next generation stablecoin factory built on Solana, powered by Node Consensus Networks and Jito Restaking.
           </p>
-          <div className="flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-4 sm:space-y-0">
+          
+          <div className={`flex flex-col items-center justify-center space-y-4 sm:flex-row sm:space-x-6 sm:space-y-0 transition-all duration-1000 delay-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
             <button
               onClick={handleGetStarted}
-              className="btn btn-primary px-8 py-3 text-base"
+              className="btn btn-primary px-10 py-4 text-lg font-semibold relative overflow-hidden group"
             >
-              Get Started
+              <span className="relative z-10">Get Started</span>
+              <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
             </button>
+            
             <a
               href="https://docs.stablefunds.io"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-outline px-8 py-3 text-base"
+              className="btn btn-outline relative px-10 py-4 text-lg font-semibold group"
             >
-              Learn More
+              <span className="relative z-10 bg-gradient-to-r from-blue-400 via-purple-400 to-orange-400 bg-clip-text text-transparent group-hover:text-white transition-colors duration-300">Learn More</span>
+              <span className="absolute inset-0 border border-gradient-border opacity-50 group-hover:opacity-100 transition-opacity duration-300"></span>
             </a>
           </div>
+          
+          <div className={`mt-16 flex flex-wrap justify-center gap-6 transition-all duration-1000 delay-900 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+            <div className="flex items-center space-x-2 bg-slate-800/30 backdrop-blur-sm px-4 py-2 rounded-full">
+              <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-sm text-slate-300">Powered by Solana</span>
+            </div>
+            <div className="flex items-center space-x-2 bg-slate-800/30 backdrop-blur-sm px-4 py-2 rounded-full">
+              <div className="h-3 w-3 rounded-full bg-blue-500 animate-pulse"></div>
+              <span className="text-sm text-slate-300">Node Consensus</span>
+            </div>
+            <div className="flex items-center space-x-2 bg-slate-800/30 backdrop-blur-sm px-4 py-2 rounded-full">
+              <div className="h-3 w-3 rounded-full bg-purple-500 animate-pulse"></div>
+              <span className="text-sm text-slate-300">Jito Restaking</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Curved wave divider */}
+        <div className="absolute bottom-0 left-0 w-full overflow-hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 120" className="w-full h-auto">
+            <path 
+              fill="#1e293b" 
+              fillOpacity="0.8" 
+              d="M0,32L48,42.7C96,53,192,75,288,74.7C384,75,480,53,576,48C672,43,768,53,864,69.3C960,85,1056,107,1152,101.3C1248,96,1344,64,1392,48L1440,32L1440,120L1392,120C1344,120,1248,120,1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z"
+            ></path>
+          </svg>
         </div>
       </section>
 
