@@ -41,3 +41,20 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     console.log('ProtectedRoute: Redirecting to connect page');
     return <Navigate to="/connect" replace state={{ from: location }} />;
   }
+
+  // Show loading state while fetching data
+  if (isLoading) {
+    console.log('ProtectedRoute: Showing loading state (loading data)');
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-center">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500"></div>
+          <p className="text-slate-600 dark:text-slate-300">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  console.log('ProtectedRoute: Rendering children');
+  return <>{children}</>;
+} 
