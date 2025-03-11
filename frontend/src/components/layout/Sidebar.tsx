@@ -94,7 +94,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     <>
       {/* Mobile overlay */}
       <div 
-        className={`fixed inset-0 z-40 bg-slate-900/50 transition-opacity duration-200 md:hidden ${
+        className={`fixed inset-0 z-40 bg-slate-900/70 backdrop-blur-sm transition-opacity duration-200 md:hidden ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         aria-hidden="true"
@@ -103,18 +103,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto bg-white p-4 transition-transform duration-200 dark:bg-slate-800 md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 transform overflow-y-auto glass-panel p-4 transition-transform duration-200 md:static md:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Logo */}
         <div className="mb-8 flex items-center justify-between">
           <NavLink to="/dashboard" className="flex items-center">
-            <span className="text-xl font-bold text-sky-500 dark:text-sky-400">STABLE-FUNDS</span>
+            <span className="text-xl font-bold gradient-text">STABLE-FUNDS</span>
           </NavLink>
           <button
             type="button"
-            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300 md:hidden"
+            className="rounded-md p-2 text-slate-300 hover:text-blue-400 transition-colors md:hidden"
             onClick={onClose}
             aria-label="Close sidebar"
           >
@@ -132,10 +132,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <NavLink
                   to={item.path}
                   className={({ isActive: linkIsActive }) => `
-                    flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors
+                    flex items-center rounded-md px-3 py-2 text-sm font-medium transition-all
                     ${linkIsActive || (!linkIsActive && checkIsActive(item.path))
-                      ? 'bg-sky-50 text-sky-600 dark:bg-sky-900/20 dark:text-sky-400'
-                      : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700/50 dark:hover:text-slate-200'
+                      ? 'gradient-border bg-slate-800/50 text-blue-400'
+                      : 'text-slate-300 hover:bg-slate-800/30 hover:text-blue-300'
                     }
                   `}
                 >
