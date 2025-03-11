@@ -73,13 +73,15 @@ export default function WalletButton() {
     <div className="relative">
       <button
         onClick={toggleDropdown}
-        className="btn btn-outline flex items-center"
+        className="gradient-border btn-outline flex items-center bg-slate-800/50 backdrop-blur-sm px-3 py-2 rounded-md transition-all hover:bg-slate-700/50"
       >
-        <span className="mr-2 h-2 w-2 rounded-full bg-green-500"></span>
-        {publicKey && formatAddress(publicKey.toString())}
+        <span className="mr-2 h-2 w-2 rounded-full bg-green-500 pulse"></span>
+        {publicKey && (
+          <span className="text-slate-100">{formatAddress(publicKey.toString())}</span>
+        )}
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className={`ml-2 h-4 w-4 transition-transform ${showDropdown ? 'rotate-180' : ''}`}
+          className={`ml-2 h-4 w-4 transition-transform text-blue-400 ${showDropdown ? 'rotate-180' : ''}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -94,12 +96,12 @@ export default function WalletButton() {
             className="fixed inset-0 z-10"
             onClick={handleClickOutside}
           ></div>
-          <div className="absolute right-0 z-20 mt-2 w-48 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 dark:bg-slate-800 dark:ring-slate-700">
+          <div className="absolute right-0 z-20 mt-2 w-48 rounded-md glass-panel py-1 shadow-lg backdrop-blur-md">
             <button
               onClick={handleCopyAddress}
-              className="flex w-full items-center px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50"
+              className="flex w-full items-center px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700/50 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M8 2a1 1 0 000 2h2a1 1 0 100-2H8z" />
                 <path d="M3 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v6h-4.586l1.293-1.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L10.414 13H15v3a2 2 0 01-2 2H5a2 2 0 01-2-2V5zM15 11h2a1 1 0 110 2h-2v-2z" />
               </svg>
@@ -107,16 +109,16 @@ export default function WalletButton() {
             </button>
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex w-full items-center px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50"
+              className="flex w-full items-center px-4 py-2 text-left text-sm text-slate-200 hover:bg-slate-700/50 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
               </svg>
               Dashboard
             </button>
             <button
               onClick={handleDisconnect}
-              className="flex w-full items-center px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-100 dark:text-red-400 dark:hover:bg-slate-700/50"
+              className="flex w-full items-center px-4 py-2 text-left text-sm text-red-400 hover:bg-slate-700/50 transition-colors"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="mr-3 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7zm-3 1a1 1 0 10-2 0v3a1 1 0 102 0V8zM8 9a1 1 0 00-2 0v1a1 1 0 102 0V9z" clipRule="evenodd" />
