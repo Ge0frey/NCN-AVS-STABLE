@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useWalletContext } from '../../context/WalletContext';
 import { useTheme } from '../../context/ThemeContext';
 import WalletButton from '../wallet/WalletButton';
+import Logo from './Logo';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -19,10 +20,10 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Menu button (mobile) & Logo */}
         <div className="flex items-center">
-          {showMenuButton && (
+          {showMenuButton ? (
             <button
               type="button"
-              className="mr-4 rounded-md p-2 text-slate-300 hover:text-blue-400 transition-colors"
+              className="md:hidden mr-4 rounded-md p-2 text-slate-300 hover:text-blue-400 transition-colors"
               onClick={onMenuClick}
               aria-label="Open menu"
             >
@@ -30,11 +31,9 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
+          ) : (
+            <Logo />
           )}
-          
-          <Link to="/" className="flex items-center">
-            <span className="text-xl font-bold gradient-text">STABLE-FUNDS</span>
-          </Link>
         </div>
 
         {/* Center: Navigation (desktop) */}
@@ -86,7 +85,7 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
                       : 'text-slate-300 hover:text-blue-400'
                   }`}
                 >
-                  Stake
+                  Jito Restaking
                 </Link>
               </li>
               <li>

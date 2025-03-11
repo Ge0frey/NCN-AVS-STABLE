@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import Logo from './Logo';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -69,7 +70,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
       </svg>
     )},
-    { path: '/stake', label: 'Stake', icon: (
+    { path: '/stake', label: 'Jito Restaking', icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path d="M13 7H7v6h6V7z" />
         <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2zM5 5h10v10H5V5z" clipRule="evenodd" />
@@ -84,10 +85,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   // Check if a route is active (including nested routes)
   const checkIsActive = (path: string) => {
-    if (path === '/dashboard') {
-      return location.pathname === path;
+    // Exact match for all paths
+    if (location.pathname === path) {
+      return true;
     }
-    return location.pathname.startsWith(path);
+    
+    // For nested routes, check if the current path starts with the menu path
+    // But exclude dashboard from this check to avoid it being highlighted for all paths
+    if (path !== '/dashboard' && location.pathname.startsWith(path)) {
+      return true;
+    }
+    
+    return false;
   };
 
   return (
@@ -109,9 +118,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Logo */}
         <div className="mb-8 flex items-center justify-between">
-          <NavLink to="/dashboard" className="flex items-center">
-            <span className="text-xl font-bold gradient-text">STABLE-FUNDS</span>
-          </NavLink>
+          <Logo />
           <button
             type="button"
             className="rounded-md p-2 text-slate-300 hover:text-blue-400 transition-colors md:hidden"

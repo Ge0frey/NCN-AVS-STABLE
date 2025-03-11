@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
+import Logo from '../components/layout/Logo';
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -22,11 +23,9 @@ export default function HomePage() {
         <div className="glow-orb glow-orb-purple w-80 h-80 bottom-10 left-10 opacity-40"></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
-          <h1 className="mb-6 text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl">
-            <span className="gradient-text text-transparent bg-clip-text bg-gradient-to-r from-blue-500 via-purple-500 to-orange-500">
-              STABLE-FUNDS
-            </span>
-          </h1>
+          <div className="flex justify-center mb-6">
+            <Logo className="scale-150" />
+          </div>
           <p className="mx-auto mb-8 max-w-2xl text-xl text-slate-300 md:text-2xl">
             The next generation stablecoin factory built on Solana, powered by Node Consensus Networks and Jito Restaking.
           </p>
@@ -248,7 +247,9 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="grid gap-8 md:grid-cols-4">
             <div>
-              <h3 className="mb-4 text-xl font-bold gradient-text">STABLE-FUNDS</h3>
+              <div className="mb-4">
+                <Logo />
+              </div>
               <p className="mb-4">
                 The next generation stablecoin factory built on Solana.
               </p>

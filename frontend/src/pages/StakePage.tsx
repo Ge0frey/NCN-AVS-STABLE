@@ -439,7 +439,7 @@ export default function StakePage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold md:text-3xl">Jito Restaking</h1>
-        <p className="mt-2 text-slate-600 dark:text-slate-300">
+        <p className="mt-2 text-slate-300">
           Stake your JitoSOL to earn additional rewards
         </p>
       </div>
