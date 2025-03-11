@@ -42,7 +42,80 @@ function App() {
     []
   )
 
-  
+  return (
+    <ThemeProvider>
+      <ConnectionProvider endpoint={endpoint}>
+        <SolanaWalletProvider wallets={wallets} autoConnect>
+          <WalletProvider>
+            <WalletModalProvider>
+              <Layout>
+                <Routes>
+                  {/* Public routes */}
+                  <Route path="/" element={<HomePage />} />
+                  <Route path="/connect" element={<ConnectPage />} />
+                  
+                  {/* Protected routes */}
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/stablecoins" element={
+                    <ProtectedRoute>
+                      <StablecoinsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/stablecoins/create" element={
+                    <ProtectedRoute>
+                      <CreateStablecoinPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/collateral" element={
+                    <ProtectedRoute>
+                      <CollateralPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/collateral/deposit" element={
+                    <ProtectedRoute>
+                      <DepositCollateralPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/collateral/withdraw" element={
+                    <ProtectedRoute>
+                      <WithdrawCollateralPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/mint" element={
+                    <ProtectedRoute>
+                      <MintPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/redeem" element={
+                    <ProtectedRoute>
+                      <RedeemPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/stake" element={
+                    <ProtectedRoute>
+                      <StakePage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/governance" element={
+                    <ProtectedRoute>
+                      <GovernancePage />
+                    </ProtectedRoute>
+                  } />
+                  
+                  {/* Fallback route */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Layout>
+            </WalletModalProvider>
+          </WalletProvider>
+        </SolanaWalletProvider>
+      </ConnectionProvider>
+    </ThemeProvider>
+  )
 }
 
 export default App
