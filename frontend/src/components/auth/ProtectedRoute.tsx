@@ -35,3 +35,9 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       </div>
     );
   }
+
+  // Redirect to connect page if wallet is not connected
+  if (!connected) {
+    console.log('ProtectedRoute: Redirecting to connect page');
+    return <Navigate to="/connect" replace state={{ from: location }} />;
+  }
