@@ -10,7 +10,7 @@ export default defineConfig({
   ],
   base: '/',
   server: {
-    port: 3173,
+    port: 5173,
     host: true,
     strictPort: true,
     // This is important for client-side routing to work properly
