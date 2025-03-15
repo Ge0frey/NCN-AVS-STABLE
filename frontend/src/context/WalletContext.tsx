@@ -2,8 +2,20 @@ import { createContext, useContext, ReactNode, useState, useEffect, useCallback 
 import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
-import { RestakingClient } from '@jito-foundation/restaking-sdk';
+// Comment out the actual import and create a mock class
+// import { RestakingClient } from '@jito-foundation/restaking-sdk';
 import api from '../services/api';
+
+// Mock RestakingClient for development
+class RestakingClient {
+  connection: Connection;
+  
+  constructor(connection: Connection) {
+    this.connection = connection;
+  }
+  
+  // Add any methods you need to mock
+}
 
 interface WalletContextProps extends WalletContextState {
   connection: Connection | null;
