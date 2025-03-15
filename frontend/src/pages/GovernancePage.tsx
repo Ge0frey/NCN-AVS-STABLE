@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
+import api from '../services/api';
 
 // Mock data for demonstration
 const mockData = {
@@ -49,6 +50,10 @@ const mockData = {
       totalVotes: 30900,
       quorum: 15000,
       endTime: Date.now() - 3600000 * 72, // 72 hours ago
+      hasVoted: true,
+      userVote: 'For',
+      executionPayload: 'parameter-update-payload',
+      executionStatus: 'Pending'
     },
     {
       id: 4,
@@ -88,6 +93,10 @@ export default function GovernancePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Add NCN state
+  const [isNcnEnabled, setIsNcnEnabled] = useState<boolean>(false);
+  const [executingProposals, setExecutingProposals] = useState<number[]>([]);
+
   // Simulate data loading
   useEffect(() => {
     console.log('GovernancePage: Loading effect triggered');
@@ -101,6 +110,21 @@ export default function GovernancePage() {
       console.log('GovernancePage: Cleanup loading effect');
       clearTimeout(timer);
     };
+  }, []);
+
+  // Add useEffect to check if NCN is enabled
+  useEffect(() => {
+    const checkNcnEnabled = async () => {
+      try {
+        const features = await api.getFeatureFlags();
+        setIsNcnEnabled(features.ncnEnabled);
+      } catch (error) {
+        console.error('Failed to check NCN status:', error);
+        setIsNcnEnabled(false);
+      }
+    };
+    
+    checkNcnEnabled();
   }, []);
 
   // Format time remaining
@@ -212,6 +236,52 @@ export default function GovernancePage() {
     }
   };
 
+  // Add handler for executing proposals
+  const handleExecuteProposal = async (proposalId: number) => {
+    if (!isNcnEnabled) return;
+    
+    try {
+      setExecutingProposals(prev => [...prev, proposalId]);
+      
+      // Generate payload image name based on proposal type and ID
+      const proposal = governanceData.pastProposals.find(p => p.id === proposalId);
+      let payloadImage = 'default-proposal-execution';
+      
+      if (proposal) {
+        // Determine appropriate payload image based on proposal type
+        if (proposal.title.toLowerCase().includes('parameter')) {
+          payloadImage = 'parameter-update-payload';
+        } else if (proposal.title.toLowerCase().includes('upgrade')) {
+          payloadImage = 'program-upgrade-payload';
+        } else if (proposal.title.toLowerCase().includes('mint')) {
+          payloadImage = 'mint-approval-payload';
+        }
+      }
+      
+      payloadImage += `-${proposalId}`;
+      
+      await api.executeProposal(proposalId, payloadImage);
+      
+      // Update the proposal status
+      setGovernanceData(prevData => ({
+        ...prevData,
+        pastProposals: prevData.pastProposals.map(p =>
+          p.id === proposalId
+            ? { ...p, executionStatus: 'Executing' }
+            : p
+        )
+      }));
+      
+      // Show success message
+      setShowSuccessModal(true);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to execute proposal:', errorMsg);
+    } finally {
+      setExecutingProposals(prev => prev.filter(id => id !== proposalId));
+    }
+  };
+
   // Render loading skeleton
   if (isLoading) {
     console.log('GovernancePage: Rendering loading skeleton');
@@ -314,6 +384,39 @@ export default function GovernancePage() {
                   </span>
                 </div>
               </div>
+
+              {/* Add execution options for passed proposals */}
+              {proposal.status === 'Passed' && isNcnEnabled && (
+                <div className="execution-options mt-4 pt-4 border-t border-slate-700">
+                  <h4 className="text-sm font-medium text-slate-300 mb-2">Execute Proposal</h4>
+                  <p className="text-xs text-slate-400 mb-2">
+                    This proposal can be executed using the Cambrian NCN.
+                  </p>
+                  
+                  <button
+                    onClick={() => handleExecuteProposal(proposal.id)}
+                    disabled={executingProposals.includes(proposal.id) || 
+                            proposal.executionStatus === 'Executing' || 
+                            proposal.executionStatus === 'Executed'}
+                    className="btn btn-primary btn-sm w-full"
+                  >
+                    {executingProposals.includes(proposal.id)
+                      ? 'Initiating...'
+                      : proposal.executionStatus === 'Executing'
+                      ? 'Executing...'
+                      : proposal.executionStatus === 'Executed'
+                      ? 'Executed'
+                      : 'Execute via NCN'}
+                  </button>
+                  
+                  {proposal.executionStatus === 'Executed' && proposal.executionResult && (
+                    <div className="execution-result mt-2 text-xs bg-green-900/20 p-2 rounded">
+                      <h5 className="font-medium text-green-400">Execution Result</h5>
+                      <p className="text-slate-300">{proposal.executionResult}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
