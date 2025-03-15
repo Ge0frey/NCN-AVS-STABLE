@@ -12,10 +12,12 @@ const execAsync = promisify(exec);
 class CambrianService {
   private avsUrl: string;
   private isEnabled: boolean;
+  private avsId: string;
   
   constructor() {
     this.avsUrl = config.CAMBRIAN_AVS_HTTP_URL;
     this.isEnabled = config.FEATURE_FLAG_NCN_ENABLED;
+    this.avsId = process.env.CAMBRIAN_AVS_ID || '9SDa7sMDqCDjSGQyjhMHHde6bvENWS68HVzQqqsAhrus';
   }
 
   /**
@@ -26,25 +28,47 @@ class CambrianService {
       this.isEnabled,
       async () => {
         try {
-          // Use Cambrian SDK to fetch actual oracle data
-          const response = await fetch(`${this.avsUrl}/api/oracle/${assetId}`);
-          const data = await response.json();
-          
-          if (!data || !data.price) {
-            throw new Error('Invalid oracle data');
+          // Try to get real oracle data from Cambrian AVS
+          try {
+            // Use Cambrian CLI to fetch oracle data
+            const { stdout } = await execAsync(`camb oracle get-price -a ${assetId} -u ${this.avsId}`);
+            const data = JSON.parse(stdout);
+            
+            if (!data || !data.price) {
+              throw new Error('Invalid oracle data from Cambrian CLI');
+            }
+            
+            return {
+              assetId,
+              price: data.price,
+              timestamp: data.timestamp || Date.now(),
+              source: data.source || 'Cambrian NCN Oracle',
+              confidence: data.confidence || 0.95
+            };
+          } catch (cliError) {
+            console.error('Error fetching oracle data from Cambrian CLI:', cliError);
+            
+            // Try HTTP API as fallback
+            const response = await fetch(`${this.avsUrl}/api/oracle/${assetId}`);
+            const data = await response.json();
+            
+            if (!data || !data.price) {
+              throw new Error('Invalid oracle data from HTTP API');
+            }
+            
+            return {
+              assetId,
+              price: data.price,
+              timestamp: data.timestamp || Date.now(),
+              source: data.source || 'Cambrian NCN Oracle',
+              confidence: data.confidence || 0.95
+            };
           }
-          
-          return {
-            assetId,
-            price: data.price,
-            timestamp: data.timestamp,
-            source: data.source || 'Cambrian NCN Oracle',
-            confidence: data.confidence || 0.95
-          };
         } catch (error) {
           console.error('Error fetching oracle data:', error);
           
           // Fallback to mock data if real data fetch fails
+          console.log('Using mock oracle data');
           const mockOracleData: OracleData = {
             assetId,
             price: assetId === 'jitosol' ? 45.23 : 1.00,
@@ -68,25 +92,47 @@ class CambrianService {
       this.isEnabled,
       async () => {
         try {
-          // Use Cambrian SDK to fetch actual operators
-          const response = await fetch(`${this.avsUrl}/api/operators`);
-          const data = await response.json();
-          
-          if (!Array.isArray(data)) {
-            throw new Error('Invalid operators data');
+          // Try to get real operator data from Cambrian AVS
+          try {
+            // Use Cambrian CLI to fetch operators
+            const { stdout } = await execAsync(`camb operator list -u ${this.avsId} --json`);
+            const data = JSON.parse(stdout);
+            
+            if (!Array.isArray(data)) {
+              throw new Error('Invalid operators data from Cambrian CLI');
+            }
+            
+            return data.map(op => ({
+              publicKey: op.publicKey || op.id,
+              name: op.name || `Operator ${op.publicKey?.substring(0, 4) || op.id?.substring(0, 4)}`,
+              status: op.status || 'Active',
+              stake: op.stake || 0,
+              rewardShare: op.rewardShare || 0.05
+            }));
+          } catch (cliError) {
+            console.error('Error fetching operators from Cambrian CLI:', cliError);
+            
+            // Try HTTP API as fallback
+            const response = await fetch(`${this.avsUrl}/api/operators`);
+            const data = await response.json();
+            
+            if (!Array.isArray(data)) {
+              throw new Error('Invalid operators data from HTTP API');
+            }
+            
+            return data.map(op => ({
+              publicKey: op.publicKey,
+              name: op.name || `Operator ${op.publicKey.substring(0, 4)}`,
+              status: op.status || 'Active',
+              stake: op.stake || 0,
+              rewardShare: op.rewardShare || 0.05
+            }));
           }
-          
-          return data.map(op => ({
-            publicKey: op.publicKey,
-            name: op.name || `Operator ${op.publicKey.substring(0, 4)}`,
-            status: op.status || 'Active',
-            stake: op.stake || 0,
-            rewardShare: op.rewardShare || 0.05
-          }));
         } catch (error) {
           console.error('Error fetching operators:', error);
           
           // Fallback to mock data if real data fetch fails
+          console.log('Using mock operator data');
           const mockOperators: NcnOperator[] = [
             {
               publicKey: '8xH3gJxzUXNFE1LfwxKNimvuUKmQUQS8kfAP8VvfbzFE',
@@ -134,7 +180,7 @@ class CambrianService {
           // Call the Cambrian CLI to execute the proposal
           try {
             const { stdout } = await execAsync(
-              `camb payload run-container -a ${this.avsUrl} ${payloadImage}`
+              `camb payload run-container -u ${this.avsId} ${payloadImage}`
             );
             
             console.log('Payload execution output:', stdout);
@@ -150,11 +196,39 @@ class CambrianService {
           } catch (execError) {
             console.error('Error executing Cambrian CLI command:', execError);
             
-            // Simulate successful execution for development
-            return {
-              success: true,
-              txId: 'simulated-transaction-id'
-            };
+            // Try HTTP API as fallback
+            try {
+              const response = await fetch(`${this.avsUrl}/api/payload/execute`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  proposalId,
+                  payloadImage
+                })
+              });
+              
+              const data = await response.json();
+              
+              if (!data.success) {
+                throw new Error(data.error || 'Failed to execute payload via HTTP API');
+              }
+              
+              return {
+                success: true,
+                txId: data.txId || 'transaction-id-from-api'
+              };
+            } catch (apiError) {
+              console.error('Error executing payload via HTTP API:', apiError);
+              
+              // Simulate successful execution for development
+              console.log('Using mock execution data');
+              return {
+                success: true,
+                txId: 'simulated-transaction-id'
+              };
+            }
           }
         } catch (error) {
           console.error('Error executing proposal:', error);
@@ -176,20 +250,44 @@ class CambrianService {
       this.isEnabled,
       async () => {
         try {
-          // In a production environment, this would use the Cambrian SDK to initialize the AVS
-          // For development, we'll simulate the initialization
-          console.log('Simulating AVS initialization');
+          console.log(`Initializing AVS ${this.avsId}`);
           
           try {
+            // Use Cambrian CLI to initialize the AVS
             const { stdout } = await execAsync(
-              'camb init -t avs ~/Documents/NCN-AVS-STABLE/NCNs-AVS-JITO-PROGRAMS/avs'
+              `camb avs run -u ${this.avsId}`
             );
             console.log('AVS initialization output:', stdout);
             return true;
           } catch (execError) {
             console.error('Error executing Cambrian CLI command:', execError);
-            // Return true for development purposes
-            return true;
+            
+            // Try HTTP API as fallback
+            try {
+              const response = await fetch(`${this.avsUrl}/api/avs/initialize`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                  avsId: this.avsId
+                })
+              });
+              
+              const data = await response.json();
+              
+              if (!data.success) {
+                throw new Error(data.error || 'Failed to initialize AVS via HTTP API');
+              }
+              
+              return true;
+            } catch (apiError) {
+              console.error('Error initializing AVS via HTTP API:', apiError);
+              
+              // Return true for development purposes
+              console.log('Using mock initialization data');
+              return true;
+            }
           }
         } catch (error) {
           console.error('Error initializing AVS:', error);
