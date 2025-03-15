@@ -2,6 +2,8 @@ import { createContext, useContext, ReactNode, useState, useEffect, useCallback 
 import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { RestakingClient } from '@jito-foundation/restaking-sdk';
+import api from '../services/api';
 
 interface WalletContextProps extends WalletContextState {
   connection: Connection | null;
@@ -11,6 +13,9 @@ interface WalletContextProps extends WalletContextState {
   isInitialized: boolean;
   setNetwork: (network: WalletAdapterNetwork) => void;
   refreshBalance: () => Promise<void>;
+  jitoClient: RestakingClient | null;
+  isJitoEnabled: boolean;
+  fetchJitoData: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextProps | undefined>(undefined);
@@ -24,6 +29,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [balance, setBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [jitoClient, setJitoClient] = useState<RestakingClient | null>(null);
+  const [isJitoEnabled, setIsJitoEnabled] = useState<boolean>(false);
 
   console.log('WalletProvider: State', {
     connected: wallet.connected,
@@ -31,7 +38,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     isLoading,
     network,
     hasConnection: !!connection,
-    balance
+    balance,
+    isJitoEnabled
   });
 
   // Initialize connection
@@ -62,6 +70,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [network]);
 
+  // Initialize Jito client
+  useEffect(() => {
+    const initializeJitoClient = async () => {
+      try {
+        // Check if NCN features are enabled
+        const features = await api.getFeatureFlags();
+        
+        if (features) {
+          setIsJitoEnabled(features.jitoRestakingEnabled);
+          
+          if (features.jitoRestakingEnabled && connection) {
+            const client = new RestakingClient(connection);
+            setJitoClient(client);
+            console.log('Jito Restaking client initialized successfully');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize Jito client:', error);
+        setJitoClient(null);
+        setIsJitoEnabled(false);
+      }
+    };
+    
+    if (connection) {
+      initializeJitoClient();
+    }
+  }, [connection]);
+
   // Update balance when wallet changes
   const refreshBalance = useCallback(async () => {
     console.log('WalletProvider: Refreshing balance');
@@ -91,6 +127,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [wallet.connected, refreshBalance]);
 
+  // Add fetchJitoData method
+  const fetchJitoData = async () => {
+    if (!isJitoEnabled || !connection || !wallet.publicKey) {
+      return;
+    }
+    
+    try {
+      // This method can be used by components that need Jito data
+      // It doesn't do anything specific here, but components can call it
+      // to refresh their Jito data
+      console.log('Fetching Jito data...');
+    } catch (error) {
+      console.error('Error fetching Jito data:', error);
+    }
+  };
+
   const contextValue: WalletContextProps = {
     ...wallet,
     connection,
@@ -100,6 +152,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     isInitialized,
     setNetwork,
     refreshBalance,
+    jitoClient,
+    isJitoEnabled,
+    fetchJitoData,
   };
 
   return (
