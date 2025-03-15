@@ -3,23 +3,30 @@ import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import api from '../services/api';
 
-// Mock data for demonstration
-const mockData = {
-  walletBalance: 12.45,
-  jitoSolHoldings: 8.32,
-  stablebondHoldings: 5000,
-  ownedStablecoins: [
-    { name: 'USDF', balance: 1250.75, icon: '💵' },
-    { name: 'EURF', balance: 850.25, icon: '💶' },
-  ],
-  collateralizationRatio: 185,
-  recentActivity: [
-    { id: 1, type: 'Deposit', amount: '5 JitoSOL', timestamp: Date.now() - 3600000 * 2 },
-    { id: 2, type: 'Mint', amount: '500 USDF', timestamp: Date.now() - 3600000 * 5 },
-    { id: 3, type: 'Stake', amount: '3 JitoSOL', timestamp: Date.now() - 3600000 * 24 },
-    { id: 4, type: 'Governance', action: 'Voted on Proposal #12', timestamp: Date.now() - 3600000 * 48 },
-  ],
-  networkStatus: 'Healthy',
+// Define types for dashboard data
+interface Stablecoin {
+  name: string;
+  balance: number;
+  icon: string;
+}
+
+interface Activity {
+  id: number;
+  type: 'Deposit' | 'Mint' | 'Stake' | 'Governance';
+  amount?: string;
+  action?: string;
+  timestamp: number;
+}
+
+// Initial empty state
+const initialDashboardState = {
+  walletBalance: 0,
+  jitoSolHoldings: 0,
+  stablebondHoldings: 0,
+  ownedStablecoins: [] as Stablecoin[],
+  collateralizationRatio: 0,
+  recentActivity: [] as Activity[],
+  networkStatus: 'Unknown',
 };
 
 export default function DashboardPage() {
@@ -28,7 +35,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { balance, publicKey, connected, isInitialized, isLoading } = useWalletContext();
   const [isPageLoading, setIsPageLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState(mockData);
+  const [dashboardData, setDashboardData] = useState(initialDashboardState);
   
   // Add NCN state
   const [ncnOperators, setNcnOperators] = useState<any[]>([]);
@@ -44,21 +51,45 @@ export default function DashboardPage() {
     balance,
   });
 
-  // Simulate data loading
+  // Load dashboard data
   useEffect(() => {
-    console.log('DashboardPage: Loading data');
-    const timer = setTimeout(() => {
-      console.log('DashboardPage: Data loaded');
-      setIsPageLoading(false);
-      // In a real app, you would fetch data from your API here
-      setDashboardData({
-        ...mockData,
-        walletBalance: balance,
-      });
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [balance]);
+    const loadDashboardData = async () => {
+      setIsPageLoading(true);
+      
+      try {
+        // In a real application, you would fetch all this data from your API
+        // For now, we'll use the wallet balance and some placeholder data
+        
+        // Get user positions from Jito Restaking if wallet is connected
+        let jitoSolHoldings = 0;
+        if (connected && publicKey) {
+          try {
+            const positions = await api.getUserPositions(publicKey.toString());
+            jitoSolHoldings = positions.reduce((total, pos) => total + pos.stakedAmount, 0);
+          } catch (error) {
+            console.error('Failed to fetch Jito positions:', error);
+          }
+        }
+        
+        // Set dashboard data with real wallet balance and Jito holdings
+        setDashboardData({
+          walletBalance: balance,
+          jitoSolHoldings,
+          stablebondHoldings: 0, // This would come from your stablecoin contract
+          ownedStablecoins: [], // This would come from your stablecoin contract
+          collateralizationRatio: 0, // This would be calculated based on real data
+          recentActivity: [], // This would come from transaction history
+          networkStatus: 'Healthy', // This could come from a network status endpoint
+        });
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      } finally {
+        setIsPageLoading(false);
+      }
+    };
+    
+    loadDashboardData();
+  }, [balance, connected, publicKey]);
   
   // Add useEffect to fetch NCN operators
   useEffect(() => {

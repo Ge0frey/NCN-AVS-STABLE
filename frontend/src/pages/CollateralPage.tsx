@@ -3,59 +3,118 @@ import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import api from '../services/api';
 
-// Mock data for demonstration
-const mockCollateralData = {
-  totalCollateralValue: 12500,
-  collateralRatio: 185,
+// Define types for collateral data
+interface CollateralAsset {
+  id: string;
+  name: string;
+  icon: string;
+  balance: number;
+  value: number;
+  apy: number;
+  price: number;
+}
+
+interface HistoryPoint {
+  date: string;
+  value: number;
+}
+
+// Initial empty state
+const initialCollateralState = {
+  totalCollateralValue: 0,
+  collateralRatio: 0,
   collateralAssets: [
     {
       id: 'jitosol',
       name: 'JitoSOL',
       icon: '🔷',
-      balance: 8.32,
-      value: 7500,
-      apy: 5.2,
-      price: 901.44,
+      balance: 0,
+      value: 0,
+      apy: 0,
+      price: 0,
     },
     {
       id: 'stablebond',
       name: 'Stablebond',
       icon: '🔒',
-      balance: 5000,
-      value: 5000,
-      apy: 3.8,
-      price: 1.00,
+      balance: 0,
+      value: 0,
+      apy: 0,
+      price: 0,
     },
-  ],
-  collateralHistory: [
-    { date: '2023-10-01', value: 8000 },
-    { date: '2023-11-01', value: 9200 },
-    { date: '2023-12-01', value: 10500 },
-    { date: '2024-01-01', value: 11800 },
-    { date: '2024-02-01', value: 12500 },
-  ],
+  ] as CollateralAsset[],
+  collateralHistory: [] as HistoryPoint[],
 };
 
 export default function CollateralPage() {
   const navigate = useNavigate();
-  const { balance } = useWalletContext();
+  const { balance, publicKey, connected } = useWalletContext();
   const [isLoading, setIsLoading] = useState(true);
-  const [collateralData, setCollateralData] = useState(mockCollateralData);
+  const [collateralData, setCollateralData] = useState(initialCollateralState);
   
   // Add oracle price state
   const [oraclePrices, setOraclePrices] = useState<Record<string, number>>({});
   const [isOracleEnabled, setIsOracleEnabled] = useState<boolean>(false);
   const [isLoadingOracle, setIsLoadingOracle] = useState<boolean>(false);
 
-  // Simulate data loading
+  // Load collateral data
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-      // In a real app, you would fetch data from your API here
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, []);
+    const loadCollateralData = async () => {
+      setIsLoading(true);
+      
+      try {
+        // In a real application, you would fetch all this data from your API
+        // For now, we'll use placeholder data with real prices if available
+        
+        // Get user positions from Jito Restaking if wallet is connected
+        let jitoSolBalance = 0;
+        if (connected && publicKey) {
+          try {
+            const positions = await api.getUserPositions(publicKey.toString());
+            jitoSolBalance = positions.reduce((total, pos) => total + pos.stakedAmount, 0);
+          } catch (error) {
+            console.error('Failed to fetch Jito positions:', error);
+          }
+        }
+        
+        // Create a copy of the initial state to update
+        const updatedCollateralData = { ...initialCollateralState };
+        
+        // Update JitoSOL balance with real data
+        const jitoSolAsset = updatedCollateralData.collateralAssets.find(asset => asset.id === 'jitosol');
+        if (jitoSolAsset) {
+          jitoSolAsset.balance = jitoSolBalance;
+          
+          // Use oracle price if available
+          if (oraclePrices['jitosol']) {
+            jitoSolAsset.price = oraclePrices['jitosol'];
+            jitoSolAsset.value = jitoSolBalance * oraclePrices['jitosol'];
+          }
+        }
+        
+        // Update Stablebond with oracle price if available
+        const stablebondAsset = updatedCollateralData.collateralAssets.find(asset => asset.id === 'stablebond');
+        if (stablebondAsset && oraclePrices['stablebond']) {
+          stablebondAsset.price = oraclePrices['stablebond'];
+          // Note: We don't have real stablebond balance data yet
+        }
+        
+        // Calculate total collateral value
+        updatedCollateralData.totalCollateralValue = updatedCollateralData.collateralAssets.reduce(
+          (total, asset) => total + asset.value, 
+          0
+        );
+        
+        setCollateralData(updatedCollateralData);
+      } catch (error) {
+        console.error('Failed to load collateral data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadCollateralData();
+  }, [balance, connected, publicKey, oraclePrices]);
   
   // Add useEffect to fetch oracle prices
   useEffect(() => {
@@ -72,7 +131,7 @@ export default function CollateralPage() {
           // Fetch oracle prices for each asset
           const prices: Record<string, number> = {};
           
-          for (const asset of collateralData.collateralAssets) {
+          for (const asset of initialCollateralState.collateralAssets) {
             try {
               const data = await api.getAssetPrice(asset.id);
               if (data && data.price) {
@@ -94,14 +153,14 @@ export default function CollateralPage() {
     };
     
     fetchOraclePrices();
-  }, [collateralData.collateralAssets]);
+  }, []);
 
   // Calculate health status based on collateralization ratio
   const getHealthStatus = (ratio: number) => {
-    if (ratio >= 175) return { status: 'Excellent', color: 'text-green-500 dark:text-green-400' };
-    if (ratio >= 150) return { status: 'Good', color: 'text-sky-500 dark:text-sky-400' };
-    if (ratio >= 130) return { status: 'Fair', color: 'text-amber-500 dark:text-amber-400' };
-    return { status: 'At Risk', color: 'text-red-500 dark:text-red-400' };
+    if (ratio >= 200) return { status: 'Excellent', color: 'text-green-400' };
+    if (ratio >= 150) return { status: 'Good', color: 'text-blue-400' };
+    if (ratio >= 120) return { status: 'Moderate', color: 'text-yellow-400' };
+    return { status: 'At Risk', color: 'text-red-400' };
   };
 
   const healthStatus = getHealthStatus(collateralData.collateralRatio);
