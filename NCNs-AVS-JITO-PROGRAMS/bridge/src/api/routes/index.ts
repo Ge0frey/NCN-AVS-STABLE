@@ -7,19 +7,19 @@ import * as featureController from '../controllers/featureController';
 const router = Router();
 
 // Feature status routes
-router.get('/features', featureController.getFeatureStatus);
+router.get('/features', (req, res) => featureController.getFeatureStatus(req, res));
 
 // Oracle routes
-router.get('/oracle/price/:assetId', oracleController.getAssetPrice);
-router.get('/oracle/operators', oracleController.getOperators);
+router.get('/oracle/price/:assetId', (req, res) => oracleController.getAssetPrice(req, res));
+router.get('/oracle/operators', (req, res) => oracleController.getOperators(req, res));
 
 // Restaking routes
-router.get('/restaking/vaults', restakingController.getVaults);
-router.get('/restaking/positions/:walletAddress', restakingController.getUserPositions);
-router.post('/restaking/stake', restakingController.stakeToVault);
-router.post('/restaking/unstake', restakingController.unstakeFromVault);
+router.get('/restaking/vaults', (req, res) => restakingController.getVaults(req, res));
+router.get('/restaking/positions/:walletAddress', (req, res) => restakingController.getUserPositions(req, res));
+router.post('/restaking/stake', (req, res) => restakingController.stakeToVault(req, res));
+router.post('/restaking/unstake', (req, res) => restakingController.unstakeFromVault(req, res));
 
 // Governance routes
-router.post('/governance/execute', governanceController.executeProposal);
+router.post('/governance/execute', (req, res) => governanceController.executeProposal(req, res));
 
 export default router;
