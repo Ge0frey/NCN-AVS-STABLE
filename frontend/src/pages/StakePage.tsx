@@ -1,555 +1,404 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
+import api from '../services/api';
 
-// Mock data for demonstration
-const mockData = {
-  jitoSolBalance: 8.32,
-  stakedJitoSol: 12.5,
-  totalStaked: 1250000,
-  apy: 5.2,
-  stakingOptions: [
-    {
-      id: 'flexible',
-      name: 'Flexible',
-      description: 'No lock period, withdraw anytime',
-      apy: 5.2,
-      lockPeriod: 0,
-      minAmount: 0.1,
-    },
-    {
-      id: 'locked30',
-      name: '30-Day Lock',
-      description: 'Lock for 30 days for higher rewards',
-      apy: 6.5,
-      lockPeriod: 30,
-      minAmount: 0.5,
-    },
-    {
-      id: 'locked90',
-      name: '90-Day Lock',
-      description: 'Lock for 90 days for maximum rewards',
-      apy: 8.0,
-      lockPeriod: 90,
-      minAmount: 1.0,
-    },
-  ],
-  rewardHistory: [
-    { date: '2024-02-01', amount: 0.042 },
-    { date: '2024-01-01', amount: 0.039 },
-    { date: '2023-12-01', amount: 0.044 },
-    { date: '2023-11-01', amount: 0.041 },
-    { date: '2023-10-01', amount: 0.038 },
-  ],
-};
+interface Vault {
+  address: string;
+  name: string;
+  balance: number;
+  delegatedAmount: number;
+  apy: number;
+}
+
+interface Position {
+  vaultAddress: string;
+  stakedAmount: number;
+  rewards: number;
+  lockPeriod: number;
+  lockExpiry: number | null;
+}
 
 export default function StakePage() {
-  const navigate = useNavigate();
-  const { balance } = useWalletContext();
-  
-  // Form state
-  const [selectedOption, setSelectedOption] = useState('');
-  const [amount, setAmount] = useState('');
+  const { publicKey, connected, isJitoEnabled } = useWalletContext();
+  const [activeTab, setActiveTab] = useState<'jito' | 'regular'>('jito');
+  const [vaults, setVaults] = useState<Vault[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stakeAmount, setStakeAmount] = useState<string>('');
+  const [selectedVault, setSelectedVault] = useState<string | null>(null);
+  const [lockPeriod, setLockPeriod] = useState<number>(0);
+  const [unstakeAmount, setUnstakeAmount] = useState<string>('');
+  const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'stake' | 'unstake'>('stake');
-  
-  // Get selected staking option details
-  const stakingOption = mockData.stakingOptions.find(option => option.id === selectedOption);
-  
-  // Calculate estimated rewards
-  const calculateEstimatedRewards = () => {
-    if (!amount || !stakingOption) return { monthly: 0, yearly: 0 };
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Load vaults and positions
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Check if Jito is enabled
+        const features = await api.getFeatureFlags();
+        
+        if (!features.jitoRestakingEnabled) {
+          setError('Jito Restaking is currently disabled');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Load vaults
+        const vaultsData = await api.getVaults();
+        setVaults(vaultsData);
+        
+        // Load positions if connected
+        if (connected && publicKey) {
+          const positionsData = await api.getUserPositions(publicKey.toString());
+          setPositions(positionsData);
+        } else {
+          setPositions([]);
+        }
+      } catch (err) {
+        setError('Failed to load staking data');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount)) return { monthly: 0, yearly: 0 };
-    
-    const yearlyReward = numericAmount * (stakingOption.apy / 100);
-    const monthlyReward = yearlyReward / 12;
-    
-    return { monthly: monthlyReward, yearly: yearlyReward };
-  };
+    loadData();
+  }, [connected, publicKey]);
   
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle staking
+  const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedOption || !amount || parseFloat(amount) <= 0) {
+    if (!connected || !publicKey) {
+      setError('Please connect your wallet');
+      return;
+    }
+    
+    if (!selectedVault) {
+      setError('Please select a vault');
+      return;
+    }
+    
+    const amount = parseFloat(stakeAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setError('Please enter a valid amount');
       return;
     }
     
     setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
     
     try {
-      // In a real app, you would send the transaction to your API/blockchain here
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      await api.stakeToVault(
+        publicKey.toString(),
+        selectedVault,
+        amount,
+        lockPeriod
+      );
       
-      setShowSuccessModal(true);
-    } catch (error) {
-      console.error('Error staking JitoSOL:', error);
-      // Handle error (show error message)
+      setSuccess(`Successfully staked ${amount} SOL`);
+      setStakeAmount('');
+      
+      // Refresh positions
+      const positionsData = await api.getUserPositions(publicKey.toString());
+      setPositions(positionsData);
+    } catch (err) {
+      setError('Failed to stake: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  // Handle success modal close
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    navigate('/dashboard');
-  };
-  
-  // Handle max button click
-  const handleMaxClick = () => {
-    if (activeTab === 'stake') {
-      setAmount(mockData.jitoSolBalance.toString());
-    } else {
-      setAmount(mockData.stakedJitoSol.toString());
+  // Handle unstaking
+  const handleUnstake = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!connected || !publicKey) {
+      setError('Please connect your wallet');
+      return;
+    }
+    
+    if (selectedPosition === null) {
+      setError('Please select a position');
+      return;
+    }
+    
+    const position = positions[selectedPosition];
+    const amount = parseFloat(unstakeAmount);
+    if (isNaN(amount) || amount <= 0 || amount > position.stakedAmount) {
+      setError(`Please enter a valid amount (max: ${position.stakedAmount} SOL)`);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      await api.unstakeFromVault(
+        publicKey.toString(),
+        position.vaultAddress,
+        amount
+      );
+      
+      setSuccess(`Successfully unstaked ${amount} SOL`);
+      setUnstakeAmount('');
+      
+      // Refresh positions
+      const positionsData = await api.getUserPositions(publicKey.toString());
+      setPositions(positionsData);
+    } catch (err) {
+      setError('Failed to unstake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsSubmitting(false);
     }
   };
-  
-  // Success Modal
-  const renderSuccessModal = () => {
-    if (!showSuccessModal) return null;
-    
+
+  if (!isJitoEnabled) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h3 className="mb-2 text-xl font-bold">
-            {activeTab === 'stake' ? 'Staking Successful!' : 'Unstaking Successful!'}
-          </h3>
-          <p className="mb-4 text-slate-600 dark:text-slate-300">
-            {activeTab === 'stake' 
-              ? `You have successfully staked ${amount} JitoSOL.`
-              : `You have successfully unstaked ${amount} JitoSOL.`
-            }
-          </p>
-          <div className="flex justify-end">
-            <button
-              onClick={handleSuccessModalClose}
-              className="btn btn-primary"
-            >
-              View Dashboard
-            </button>
-          </div>
-        </div>
+      <div className="mt-8 text-center">
+        <h2 className="text-2xl font-bold mb-4">Jito Restaking</h2>
+        <p className="text-slate-400">Jito Restaking is currently disabled.</p>
       </div>
     );
-  };
-  
-  // Render staking form
-  const renderStakingForm = () => {
-    return (
-      <form onSubmit={handleSubmit}>
-        {/* Staking Option Selection */}
-        <div className="mb-6">
-          <label className="mb-2 block text-sm font-medium">
-            Select Staking Option
-          </label>
-          <div className="space-y-4">
-            {mockData.stakingOptions.map((option) => (
-              <div
-                key={option.id}
-                onClick={() => setSelectedOption(option.id)}
-                className={`cursor-pointer rounded-lg border p-4 transition-all hover:border-sky-500 dark:hover:border-sky-400 ${
-                  selectedOption === option.id
-                    ? 'border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-900/20'
-                    : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
-                }`}
-              >
-                <div className="flex items-center">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-medium">{option.name}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{option.description}</p>
-                  </div>
-                  <div className="ml-4">
-                    <div className={`flex h-6 w-6 items-center justify-center rounded-full border ${
-                      selectedOption === option.id
-                        ? 'border-sky-500 bg-sky-500 text-white dark:border-sky-400 dark:bg-sky-400'
-                        : 'border-slate-300 dark:border-slate-600'
-                    }`}>
-                      {selectedOption === option.id && (
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6 gradient-text">Jito Restaking</h1>
+      
+      {/* Tabs */}
+      <div className="flex border-b border-slate-700 mb-6">
+        <button
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'jito'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+          onClick={() => setActiveTab('jito')}
+        >
+          Jito Restaking
+        </button>
+        <button
+          className={`px-4 py-2 font-medium ${
+            activeTab === 'regular'
+              ? 'text-blue-400 border-b-2 border-blue-400'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+          onClick={() => setActiveTab('regular')}
+        >
+          Regular Staking
+        </button>
+      </div>
+      
+      {/* Error and Success Messages */}
+      {error && (
+        <div className="mb-6 rounded-md bg-red-900/20 border border-red-700 p-4 text-red-400">
+          {error}
+        </div>
+      )}
+      
+      {success && (
+        <div className="mb-6 rounded-md bg-green-900/20 border border-green-700 p-4 text-green-400">
+          {success}
+        </div>
+      )}
+      
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : (
+        activeTab === 'jito' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Staking Form */}
+            <div className="glass-panel p-6 col-span-1">
+              <h2 className="text-xl font-bold mb-4">Stake Tokens</h2>
+              
+              <form onSubmit={handleStake}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Select Vault
+                  </label>
+                  <select
+                    className="select w-full"
+                    value={selectedVault || ''}
+                    onChange={(e) => setSelectedVault(e.target.value)}
+                    required
+                  >
+                    <option value="">Select a vault</option>
+                    {vaults.map((vault) => (
+                      <option key={vault.address} value={vault.address}>
+                        {vault.name} - {vault.apy.toFixed(2)}% APY
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 
-                <div className="mt-4 flex justify-between rounded-md bg-slate-50 p-3 dark:bg-slate-700/50">
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">APY</p>
-                    <p className="font-medium text-green-600 dark:text-green-400">{option.apy}%</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Lock Period</p>
-                    <p className="font-medium">
-                      {option.lockPeriod > 0 ? `${option.lockPeriod} days` : 'None'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Min Amount</p>
-                    <p className="font-medium">{option.minAmount} JitoSOL</p>
-                  </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Amount to Stake (SOL)
+                  </label>
+                  <input
+                    type="number"
+                    className="input w-full"
+                    placeholder="0.0"
+                    value={stakeAmount}
+                    onChange={(e) => setStakeAmount(e.target.value)}
+                    min="0.1"
+                    step="0.1"
+                    required
+                    id="stake-amount"
+                  />
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Amount Input */}
-        <div className="mb-6">
-          <label htmlFor="amount" className="mb-2 block text-sm font-medium">
-            Amount to Stake
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              id="amount"
-              className="input pr-24"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              disabled={!selectedOption}
-              min="0"
-              step="any"
-              required
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center">
-              <button
-                type="button"
-                className="mr-2 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600"
-                onClick={handleMaxClick}
-                disabled={!selectedOption}
-              >
-                MAX
-              </button>
-              <span className="mr-3 text-slate-500 dark:text-slate-400">
-                JitoSOL
-              </span>
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Available: {mockData.jitoSolBalance.toLocaleString()} JitoSOL
-          </p>
-        </div>
-        
-        {/* Staking Summary */}
-        {selectedOption && amount && parseFloat(amount) > 0 && (
-          <div className="mb-6 rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
-            <h3 className="mb-2 font-medium">Staking Summary</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Amount to Stake</span>
-                <span className="font-medium">{parseFloat(amount).toLocaleString()} JitoSOL</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Staking Option</span>
-                <span className="font-medium">{stakingOption?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Lock Period</span>
-                <span className="font-medium">
-                  {stakingOption?.lockPeriod ? `${stakingOption.lockPeriod} days` : 'None'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">APY</span>
-                <span className="font-medium text-green-600 dark:text-green-400">{stakingOption?.apy}%</span>
-              </div>
-              <div className="border-t border-slate-200 pt-2 dark:border-slate-700">
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-300">Est. Monthly Rewards</span>
-                  <span className="font-medium">{calculateEstimatedRewards().monthly.toFixed(4)} JitoSOL</span>
+                
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Lock Period (days)
+                  </label>
+                  <select
+                    className="select w-full"
+                    value={lockPeriod}
+                    onChange={(e) => setLockPeriod(parseInt(e.target.value))}
+                  >
+                    <option value="0">No lock (flexible)</option>
+                    <option value="30">30 days (higher rewards)</option>
+                    <option value="90">90 days (maximum rewards)</option>
+                  </select>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-300">Est. Yearly Rewards</span>
-                  <span className="font-medium">{calculateEstimatedRewards().yearly.toFixed(4)} JitoSOL</span>
-                </div>
-              </div>
+                
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full"
+                  disabled={isSubmitting || !connected}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Staking...
+                    </span>
+                  ) : (
+                    'Stake'
+                  )}
+                </button>
+              </form>
             </div>
             
-            {stakingOption && parseFloat(amount) < stakingOption.minAmount && (
-              <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                <div className="flex">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span>
-                    Minimum amount for this staking option is {stakingOption.minAmount} JitoSOL.
-                  </span>
+            {/* Vault Information */}
+            <div className="glass-panel p-6 col-span-1 lg:col-span-2">
+              <h2 className="text-xl font-bold mb-4">Available Vaults</h2>
+              
+              {vaults.length === 0 ? (
+                <p className="text-slate-400">No vaults available</p>
+              ) : (
+                <div className="space-y-4">
+                  {vaults.map((vault) => (
+                    <div key={vault.address} className="gradient-border p-4 rounded-lg bg-slate-800/50">
+                      <div className="flex justify-between mb-2">
+                        <h3 className="font-bold">{vault.name}</h3>
+                        <span className="text-green-400">{vault.apy.toFixed(2)}% APY</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-slate-300">
+                        <div>Total Balance: {vault.balance.toLocaleString()} SOL</div>
+                        <div>Delegated: {vault.delegatedAmount.toLocaleString()} SOL</div>
+                      </div>
+                      <button
+                        className="btn btn-secondary mt-3 w-full"
+                        onClick={() => {
+                          setSelectedVault(vault.address);
+                          document.getElementById('stake-amount')?.focus();
+                        }}
+                      >
+                        Select Vault
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* User Positions */}
+            {connected && positions.length > 0 && (
+              <div className="glass-panel p-6 col-span-1 lg:col-span-3">
+                <h2 className="text-xl font-bold mb-4">Your Positions</h2>
+                
+                <div className="space-y-4">
+                  {positions.map((position, index) => {
+                    const vault = vaults.find(v => v.address === position.vaultAddress);
+                    
+                    return (
+                      <div key={index} className="gradient-border p-4 rounded-lg bg-slate-800/50">
+                        <div className="flex justify-between mb-2">
+                          <h3 className="font-bold">{vault?.name || 'Unknown Vault'}</h3>
+                          <span className="text-green-400">
+                            {position.rewards.toFixed(4)} SOL Rewards
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 text-sm text-slate-300 mb-3">
+                          <div>Staked Amount: {position.stakedAmount.toFixed(4)} SOL</div>
+                          <div>
+                            Lock Period: {position.lockPeriod > 0 
+                              ? `${position.lockPeriod} days` 
+                              : 'No lock'}
+                          </div>
+                          {position.lockExpiry && (
+                            <div>
+                              Lock Expires: {new Date(position.lockExpiry).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <form className="flex gap-2" onSubmit={handleUnstake}>
+                          <input
+                            type="number"
+                            className="input flex-1"
+                            placeholder={`Amount (max: ${position.stakedAmount} SOL)`}
+                            value={selectedPosition === index ? unstakeAmount : ''}
+                            onChange={(e) => {
+                              setSelectedPosition(index);
+                              setUnstakeAmount(e.target.value);
+                            }}
+                            min="0.001"
+                            max={position.stakedAmount}
+                            step="0.001"
+                            required
+                          />
+                          <button
+                            type="submit"
+                            className="btn btn-primary whitespace-nowrap"
+                            disabled={isSubmitting || selectedPosition !== index}
+                          >
+                            {isSubmitting && selectedPosition === index ? 'Unstaking...' : 'Unstake'}
+                          </button>
+                        </form>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
           </div>
-        )}
-        
-        {/* Submit Button */}
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="btn btn-outline"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={
-              !selectedOption || 
-              !amount || 
-              parseFloat(amount) <= 0 || 
-              parseFloat(amount) > mockData.jitoSolBalance ||
-              (stakingOption && parseFloat(amount) < stakingOption.minAmount) ||
-              isSubmitting
-            }
-            className="btn btn-primary"
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              </>
-            ) : (
-              'Stake JitoSOL'
-            )}
-          </button>
-        </div>
-      </form>
-    );
-  };
-  
-  // Render unstaking form
-  const renderUnstakingForm = () => {
-    return (
-      <form onSubmit={handleSubmit}>
-        {/* Amount Input */}
-        <div className="mb-6">
-          <label htmlFor="unstakeAmount" className="mb-2 block text-sm font-medium">
-            Amount to Unstake
-          </label>
-          <div className="relative">
-            <input
-              type="number"
-              id="unstakeAmount"
-              className="input pr-24"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              min="0"
-              step="any"
-              required
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center">
-              <button
-                type="button"
-                className="mr-2 rounded-md bg-slate-100 px-2 py-1 text-xs font-medium hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600"
-                onClick={handleMaxClick}
-              >
-                MAX
-              </button>
-              <span className="mr-3 text-slate-500 dark:text-slate-400">
-                JitoSOL
-              </span>
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Staked: {mockData.stakedJitoSol.toLocaleString()} JitoSOL
-          </p>
-        </div>
-        
-        {/* Unstaking Summary */}
-        {amount && parseFloat(amount) > 0 && (
-          <div className="mb-6 rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
-            <h3 className="mb-2 font-medium">Unstaking Summary</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Amount to Unstake</span>
-                <span className="font-medium">{parseFloat(amount).toLocaleString()} JitoSOL</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Remaining Staked</span>
-                <span className="font-medium">
-                  {Math.max(0, mockData.stakedJitoSol - parseFloat(amount)).toFixed(4)} JitoSOL
-                </span>
-              </div>
-            </div>
-            
-            {parseFloat(amount) > mockData.stakedJitoSol && (
-              <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-300">
-                <div className="flex">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span>
-                    Insufficient staked balance. You only have {mockData.stakedJitoSol.toLocaleString()} JitoSOL staked.
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Submit Button */}
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="btn btn-outline"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={
-              !amount || 
-              parseFloat(amount) <= 0 || 
-              parseFloat(amount) > mockData.stakedJitoSol ||
-              isSubmitting
-            }
-            className="btn btn-primary"
-          >
-            {isSubmitting ? (
-              <>
-                <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Processing...
-              </>
-            ) : (
-              'Unstake JitoSOL'
-            )}
-          </button>
-        </div>
-      </form>
-    );
-  };
-  
-  return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold md:text-3xl">Jito Restaking</h1>
-        <p className="mt-2 text-slate-300">
-          Stake your JitoSOL to earn additional rewards
-        </p>
-      </div>
-      
-      <div className="grid gap-8 md:grid-cols-3">
-        <div className="md:col-span-2">
-          <div className="card">
-            {/* Tabs */}
-            <div className="mb-6 flex border-b border-slate-200 dark:border-slate-700">
-              <button
-                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'stake'
-                    ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400'
-                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300'
-                }`}
-                onClick={() => setActiveTab('stake')}
-              >
-                Stake
-              </button>
-              <button
-                className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'unstake'
-                    ? 'border-sky-500 text-sky-600 dark:border-sky-400 dark:text-sky-400'
-                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-300'
-                }`}
-                onClick={() => setActiveTab('unstake')}
-              >
-                Unstake
-              </button>
-            </div>
-            
-            {/* Tab Content */}
-            {activeTab === 'stake' ? renderStakingForm() : renderUnstakingForm()}
-          </div>
-        </div>
-        
-        {/* Information Panel */}
-        <div className="space-y-6">
-          <div className="card">
-            <h3 className="mb-4 text-lg font-bold">Staking Overview</h3>
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Available JitoSOL</span>
-                <span className="font-medium">{mockData.jitoSolBalance.toLocaleString()} JitoSOL</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Staked JitoSOL</span>
-                <span className="font-medium">{mockData.stakedJitoSol.toLocaleString()} JitoSOL</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Current APY</span>
-                <span className="font-medium text-green-600 dark:text-green-400">{mockData.apy}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600 dark:text-slate-300">Total Staked (Platform)</span>
-                <span className="font-medium">{mockData.totalStaked.toLocaleString()} JitoSOL</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="card">
-            <h3 className="mb-4 text-lg font-bold">About Jito Restaking</h3>
-            <p className="mb-4 text-slate-600 dark:text-slate-300">
-              Jito Restaking allows you to earn additional rewards by staking your JitoSOL tokens, contributing to network security while generating passive income.
+        ) : (
+          <div className="text-center py-12">
+            <h2 className="text-xl mb-4">Regular Staking Coming Soon</h2>
+            <p className="text-slate-400">
+              Traditional SOL staking features will be available in a future update.
             </p>
-            <div className="rounded-md bg-sky-50 p-4 dark:bg-sky-900/20">
-              <h4 className="mb-2 font-medium text-sky-800 dark:text-sky-300">Key Benefits</h4>
-              <ul className="space-y-2 text-sm text-sky-700 dark:text-sky-300">
-                <li className="flex items-start">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Earn additional rewards on top of regular staking</span>
-                </li>
-                <li className="flex items-start">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Support the Node Consensus Network (NCN)</span>
-                </li>
-                <li className="flex items-start">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span>Choose flexible or locked staking options</span>
-                </li>
-              </ul>
-            </div>
           </div>
-          
-          <div className="card">
-            <h3 className="mb-4 text-lg font-bold">Recent Rewards</h3>
-            {mockData.rewardHistory.length > 0 ? (
-              <div className="space-y-3">
-                {mockData.rewardHistory.map((reward, index) => (
-                  <div key={index} className="flex justify-between border-b border-slate-100 pb-2 last:border-0 dark:border-slate-800">
-                    <span className="text-slate-600 dark:text-slate-300">{reward.date}</span>
-                    <span className="font-medium text-green-600 dark:text-green-400">+{reward.amount.toFixed(4)} JitoSOL</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-slate-500 dark:text-slate-400">No rewards history available yet.</p>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Success Modal */}
-      {renderSuccessModal()}
+        )
+      )}
     </div>
   );
 } 
