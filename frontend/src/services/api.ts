@@ -3,6 +3,7 @@ const API_BASE_URL = 'http://localhost:3001/api';
 // General fetch wrapper with error handling
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   try {
+    console.log(`API Request: ${endpoint}`);
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
@@ -11,7 +12,14 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
       },
     });
 
+    console.log(`API Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const data = await response.json();
+    console.log(`API Response data:`, data);
 
     if (!data.success) {
       throw new Error(data.error || 'API request failed');
@@ -26,6 +34,7 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
 
 // Feature flags
 export async function getFeatureFlags() {
+  console.log('Fetching feature flags');
   return fetchAPI<{ncnEnabled: boolean; jitoRestakingEnabled: boolean}>('/features');
 }
 
