@@ -161,11 +161,40 @@ export default function StakePage() {
     }
   };
 
+  // Add a function to test the API connection
+  const testApiConnection = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      console.log('Testing API connection...');
+      const features = await api.getFeatureFlags();
+      console.log('API connection successful:', features);
+      setSuccess(`API connection successful: NCN enabled: ${features.ncnEnabled}, Jito Restaking enabled: ${features.jitoRestakingEnabled}`);
+    } catch (err) {
+      console.error('API connection failed:', err);
+      setError('API connection failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!isJitoEnabled) {
     return (
       <div className="mt-8 text-center">
         <h2 className="text-2xl font-bold mb-4">Jito Restaking</h2>
-        <p className="text-slate-400">Jito Restaking is currently disabled.</p>
+        <p className="text-slate-400 mb-4">Jito Restaking is currently disabled.</p>
+        
+        {/* Add a button to test the API connection */}
+        <button 
+          onClick={testApiConnection}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Testing...' : 'Test API Connection'}
+        </button>
+        
+        {error && <p className="text-red-500 mt-2">{error}</p>}
+        {success && <p className="text-green-500 mt-2">{success}</p>}
       </div>
     );
   }
