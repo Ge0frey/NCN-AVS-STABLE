@@ -20,7 +20,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@cambrianone/camb-client": "^0.0.1",
     "@solana/web3.js": "^1.98.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
