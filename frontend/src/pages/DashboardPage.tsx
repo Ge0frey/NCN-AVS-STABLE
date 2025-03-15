@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
+import api from '../services/api';
 
 // Mock data for demonstration
 const mockData = {
@@ -28,6 +29,11 @@ export default function DashboardPage() {
   const { balance, publicKey, connected, isInitialized, isLoading } = useWalletContext();
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(mockData);
+  
+  // Add NCN state
+  const [ncnOperators, setNcnOperators] = useState<any[]>([]);
+  const [isNcnEnabled, setIsNcnEnabled] = useState<boolean>(false);
+  const [isLoadingNcn, setIsLoadingNcn] = useState<boolean>(false);
 
   console.log('DashboardPage: State', {
     connected,
@@ -51,11 +57,35 @@ export default function DashboardPage() {
       });
     }, 1000);
 
-    return () => {
-      console.log('DashboardPage: Cleanup');
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, [balance]);
+  
+  // Add useEffect to fetch NCN operators
+  useEffect(() => {
+    const fetchNcnData = async () => {
+      setIsLoadingNcn(true);
+      
+      try {
+        // Check if NCN features are enabled
+        const features = await api.getFeatureFlags();
+        
+        setIsNcnEnabled(features.ncnEnabled);
+        
+        if (features.ncnEnabled) {
+          // Fetch NCN operators
+          const operators = await api.getOperators();
+          setNcnOperators(operators || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch NCN data:', error);
+        setIsNcnEnabled(false);
+      } finally {
+        setIsLoadingNcn(false);
+      }
+    };
+    
+    fetchNcnData();
+  }, []);
 
   // Format timestamp to relative time
   const formatRelativeTime = (timestamp: number) => {
@@ -336,6 +366,59 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* NCN Information Panel */}
+      {isNcnEnabled && (
+        <div className="col-span-1 md:col-span-2 glass-panel p-6">
+          <h3 className="text-xl font-bold mb-4 gradient-text">NCN Network Status</h3>
+          
+          {isLoadingNcn ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="bg-slate-800/50 p-3 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-400">{ncnOperators.length}</div>
+                  <div className="text-xs text-slate-400">Total Operators</div>
+                </div>
+                <div className="bg-slate-800/50 p-3 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-400">
+                    {ncnOperators.filter(op => op.status === 'Active').length}
+                  </div>
+                  <div className="text-xs text-slate-400">Active Operators</div>
+                </div>
+                <div className="bg-slate-800/50 p-3 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-purple-400">
+                    {ncnOperators.reduce((sum, op) => sum + op.stake, 0).toLocaleString()}
+                  </div>
+                  <div className="text-xs text-slate-400">Total Stake</div>
+                </div>
+              </div>
+              
+              <h4 className="text-sm font-medium text-slate-300 mb-2">Active Operators</h4>
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                {ncnOperators.map((operator) => (
+                  <div
+                    key={operator.publicKey}
+                    className="bg-slate-800/30 p-2 rounded flex items-center justify-between text-sm"
+                  >
+                    <div className="flex items-center">
+                      <div className={`h-2 w-2 rounded-full mr-2 ${
+                        operator.status === 'Active' ? 'bg-green-500 pulse' : 
+                        operator.status === 'Inactive' ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}></div>
+                      <span className="font-medium">{operator.name}</span>
+                    </div>
+                    <div className="text-slate-400">{operator.stake.toLocaleString()} tokens</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 } 
