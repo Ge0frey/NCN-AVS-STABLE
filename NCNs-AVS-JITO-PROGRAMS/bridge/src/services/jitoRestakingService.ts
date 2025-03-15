@@ -1,7 +1,11 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import { RestakingVault, RestakingPosition } from '../types';
 import config from '../config/env';
 import { withFeatureFlag } from '../utils';
+
+// Import Jito Restaking SDK
+// Note: This is a placeholder import. In a real implementation, you would use the actual Jito Restaking SDK
+// import { RestakingClient } from '@jito/restaking-sdk';
 
 /**
  * Service for interacting with Jito Restaking
@@ -9,10 +13,25 @@ import { withFeatureFlag } from '../utils';
 class JitoRestakingService {
   private connection: Connection;
   private isEnabled: boolean;
+  private jitoClient: any | null;
   
   constructor() {
     this.connection = new Connection(config.SOLANA_RPC_URL);
     this.isEnabled = config.FEATURE_FLAG_JITO_RESTAKING_ENABLED;
+    
+    // Initialize Jito client if enabled
+    if (this.isEnabled) {
+      try {
+        // In a real implementation, this would use the actual Jito Restaking SDK
+        // this.jitoClient = new RestakingClient(this.connection);
+        this.jitoClient = null; // Placeholder
+      } catch (error) {
+        console.error('Failed to initialize Jito client:', error);
+        this.jitoClient = null;
+      }
+    } else {
+      this.jitoClient = null;
+    }
   }
 
   /**
@@ -23,8 +42,19 @@ class JitoRestakingService {
       this.isEnabled,
       async () => {
         try {
-          // In a real implementation, this would use the Jito Restaking program to fetch vaults
-          // For now, we'll simulate the data
+          // In a real implementation, this would use the Jito client to fetch vaults
+          if (this.jitoClient) {
+            // const vaults = await this.jitoClient.getVaults();
+            // return vaults.map(vault => ({
+            //   address: vault.address.toString(),
+            //   name: vault.name,
+            //   balance: Number(vault.balance) / 1e9, // Convert lamports to SOL
+            //   delegatedAmount: Number(vault.delegatedAmount) / 1e9,
+            //   apy: vault.apy
+            // }));
+          }
+          
+          // Fallback to mock data if client is not available or fetch fails
           const mockVaults: RestakingVault[] = [
             {
               address: '8xH3gJxzUXNFE1LfwxKNimvuUKmQUQS8kfAP8VvfbzFE',
@@ -60,8 +90,20 @@ class JitoRestakingService {
       this.isEnabled,
       async () => {
         try {
-          // In a real implementation, this would query the user's positions from Jito Restaking
-          // For now, we'll simulate the data
+          // In a real implementation, this would use the Jito client to fetch user positions
+          if (this.jitoClient) {
+            // const walletPublicKey = new PublicKey(walletAddress);
+            // const positions = await this.jitoClient.getUserPositions(walletPublicKey);
+            // return positions.map(position => ({
+            //   vaultAddress: position.vaultAddress.toString(),
+            //   stakedAmount: Number(position.stakedAmount) / 1e9, // Convert lamports to SOL
+            //   rewards: Number(position.rewards) / 1e9,
+            //   lockPeriod: position.lockPeriod,
+            //   lockExpiry: position.lockExpiry ? Number(position.lockExpiry) : null
+            // }));
+          }
+          
+          // Fallback to mock data if client is not available or fetch fails
           const mockPositions: RestakingPosition[] = [
             {
               vaultAddress: '8xH3gJxzUXNFE1LfwxKNimvuUKmQUQS8kfAP8VvfbzFE',
@@ -95,11 +137,32 @@ class JitoRestakingService {
       this.isEnabled,
       async () => {
         try {
-          // In a real implementation, this would execute the staking transaction
-          // For demonstration, we'll simulate the staking
           console.log(`Staking ${amount} to vault ${vaultAddress} from wallet ${walletAddress}`);
           
-          // Simulate successful staking
+          // In a real implementation, this would use the Jito client to stake tokens
+          if (this.jitoClient) {
+            // const walletPublicKey = new PublicKey(walletAddress);
+            // const vaultPublicKey = new PublicKey(vaultAddress);
+            // const amountLamports = amount * 1e9; // Convert SOL to lamports
+            
+            // const transaction = await this.jitoClient.createStakeTransaction(
+            //   walletPublicKey,
+            //   vaultPublicKey,
+            //   amountLamports,
+            //   lockPeriod
+            // );
+            
+            // // Note: In a real implementation, the transaction would be sent to the frontend for signing
+            // // Here we're simulating a successful transaction
+            // const txId = 'simulated-transaction-id';
+            
+            // return {
+            //   success: true,
+            //   txId
+            // };
+          }
+          
+          // Simulate successful staking for development
           return {
             success: true,
             txId: 'simulated-transaction-id'
@@ -128,11 +191,31 @@ class JitoRestakingService {
       this.isEnabled,
       async () => {
         try {
-          // In a real implementation, this would execute the unstaking transaction
-          // For demonstration, we'll simulate the unstaking
           console.log(`Unstaking ${amount} from vault ${vaultAddress} to wallet ${walletAddress}`);
           
-          // Simulate successful unstaking
+          // In a real implementation, this would use the Jito client to unstake tokens
+          if (this.jitoClient) {
+            // const walletPublicKey = new PublicKey(walletAddress);
+            // const vaultPublicKey = new PublicKey(vaultAddress);
+            // const amountLamports = amount * 1e9; // Convert SOL to lamports
+            
+            // const transaction = await this.jitoClient.createUnstakeTransaction(
+            //   walletPublicKey,
+            //   vaultPublicKey,
+            //   amountLamports
+            // );
+            
+            // // Note: In a real implementation, the transaction would be sent to the frontend for signing
+            // // Here we're simulating a successful transaction
+            // const txId = 'simulated-transaction-id';
+            
+            // return {
+            //   success: true,
+            //   txId
+            // };
+          }
+          
+          // Simulate successful unstaking for development
           return {
             success: true,
             txId: 'simulated-transaction-id'
@@ -157,8 +240,14 @@ class JitoRestakingService {
       this.isEnabled,
       async () => {
         try {
-          // In a real implementation, this would query the APY from Jito Restaking
-          // For now, we'll simulate the data
+          // In a real implementation, this would use the Jito client to get the vault APY
+          if (this.jitoClient) {
+            // const vaultPublicKey = new PublicKey(vaultAddress);
+            // const vault = await this.jitoClient.getVault(vaultPublicKey);
+            // return vault.apy;
+          }
+          
+          // Fallback to mock data if client is not available or fetch fails
           return vaultAddress.startsWith('8x') ? 5.2 : 6.8;
         } catch (error) {
           console.error('Error fetching vault APY:', error);
