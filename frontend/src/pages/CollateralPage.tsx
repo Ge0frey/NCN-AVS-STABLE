@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
+import api from '../services/api';
 
 // Mock data for demonstration
 const mockCollateralData = {
@@ -14,6 +15,7 @@ const mockCollateralData = {
       balance: 8.32,
       value: 7500,
       apy: 5.2,
+      price: 901.44,
     },
     {
       id: 'stablebond',
@@ -22,6 +24,7 @@ const mockCollateralData = {
       balance: 5000,
       value: 5000,
       apy: 3.8,
+      price: 1.00,
     },
   ],
   collateralHistory: [
@@ -38,6 +41,11 @@ export default function CollateralPage() {
   const { balance } = useWalletContext();
   const [isLoading, setIsLoading] = useState(true);
   const [collateralData, setCollateralData] = useState(mockCollateralData);
+  
+  // Add oracle price state
+  const [oraclePrices, setOraclePrices] = useState<Record<string, number>>({});
+  const [isOracleEnabled, setIsOracleEnabled] = useState<boolean>(false);
+  const [isLoadingOracle, setIsLoadingOracle] = useState<boolean>(false);
 
   // Simulate data loading
   useEffect(() => {
@@ -48,6 +56,45 @@ export default function CollateralPage() {
 
     return () => clearTimeout(timer);
   }, []);
+  
+  // Add useEffect to fetch oracle prices
+  useEffect(() => {
+    const fetchOraclePrices = async () => {
+      setIsLoadingOracle(true);
+      
+      try {
+        // Check if NCN features are enabled
+        const features = await api.getFeatureFlags();
+        
+        setIsOracleEnabled(features.ncnEnabled);
+        
+        if (features.ncnEnabled) {
+          // Fetch oracle prices for each asset
+          const prices: Record<string, number> = {};
+          
+          for (const asset of collateralData.collateralAssets) {
+            try {
+              const data = await api.getAssetPrice(asset.id);
+              if (data && data.price) {
+                prices[asset.id] = data.price;
+              }
+            } catch (err) {
+              console.error(`Failed to fetch price for ${asset.id}:`, err);
+            }
+          }
+          
+          setOraclePrices(prices);
+        }
+      } catch (error) {
+        console.error('Failed to fetch oracle prices:', error);
+        setIsOracleEnabled(false);
+      } finally {
+        setIsLoadingOracle(false);
+      }
+    };
+    
+    fetchOraclePrices();
+  }, [collateralData.collateralAssets]);
 
   // Calculate health status based on collateralization ratio
   const getHealthStatus = (ratio: number) => {
@@ -256,6 +303,26 @@ export default function CollateralPage() {
                   Withdraw
                 </button>
               </div>
+              {isOracleEnabled && (
+                <div className="oracle-price mt-2 pt-2 border-t border-slate-700">
+                  {isLoadingOracle ? (
+                    <div className="flex items-center text-xs text-slate-400">
+                      <div className="h-3 w-3 mr-2 rounded-full border-2 border-slate-400 border-t-blue-400 animate-spin"></div>
+                      Loading oracle price...
+                    </div>
+                  ) : oraclePrices[asset.id] ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">Oracle Price:</span>
+                      <span className="text-sm font-medium text-blue-400">
+                        ${oraclePrices[asset.id].toFixed(2)}
+                        <span className="ml-1 text-xs text-slate-500">NCN Oracle</span>
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-400">Oracle price not available</div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
