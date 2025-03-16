@@ -7,7 +7,14 @@ import {
   createAssociatedTokenAccountInstruction
 } from '@solana/spl-token';
 import { StableFunds } from './types';
-import idl from '/home/geofrey/Documents/NCN-AVS-STABLE/blockchain-logic-stablefunds/target/idl/stablefunds.json';
+// Import the IDL safely with error handling
+let idl: any;
+try {
+  idl = require('/home/geofrey/Documents/NCN-AVS-STABLE/blockchain-logic-stablefunds/target/idl/stablefunds.json');
+} catch (error) {
+  console.error('Failed to load Anchor IDL:', error);
+  idl = {}; // Provide a fallback empty object
+}
 
 // Etherfuse SDK integration
 import { StablebondProgram } from '@etherfuse/stablebond-sdk';
@@ -41,8 +48,29 @@ export class StableFundsClient {
   provider: AnchorProvider;
   
   constructor(provider: AnchorProvider) {
+    if (!provider) {
+      throw new Error('AnchorProvider is required to initialize StableFundsClient');
+    }
+    
     this.provider = provider;
-    this.program = new Program(idl as any, PROGRAM_ID, provider);
+    
+    try {
+      // Make sure idl has the necessary properties before creating Program
+      if (!idl || !idl.metadata || !idl.instructions) {
+        throw new Error('Invalid IDL format: missing required fields');
+      }
+      
+      this.program = new Program(idl as any, PROGRAM_ID, provider);
+    } catch (error) {
+      console.error('Failed to initialize StableFundsClient program:', error);
+      // Create a minimal program object that won't throw errors when accessed
+      // This allows the app to at least render without crashing
+      this.program = {
+        programId: PROGRAM_ID,
+        provider: provider,
+        methods: {} as any,
+      } as any;
+    }
   }
   
   /**
@@ -413,6 +441,102 @@ export class StableFundsClient {
       .rpc();
     
     return { signature };
+  }
+  
+  /**
+   * Fetch user's stablecoins
+   */
+  async fetchUserStablecoins(): Promise<any[]> {
+    try {
+      // In a real implementation, this would query the blockchain for the user's stablecoins
+      // For simplicity, we'll return mock data that includes only user-created stablecoins
+      
+      // Find all stablecoin configs created by this user
+      const stablecoinConfigs = await this.program.account.stablecoinConfig.all([
+        {
+          memcmp: {
+            offset: 8, // Skip discriminator
+            bytes: this.provider.wallet.publicKey.toBase58(),
+          },
+        },
+      ]);
+      
+      if (!stablecoinConfigs || stablecoinConfigs.length === 0) {
+        return [];
+      }
+      
+      // Transform the data into a more usable format
+      const stablecoins = await Promise.all(
+        stablecoinConfigs.map(async (config) => {
+          const configAccount = config.account;
+          const mint = configAccount.mint;
+          
+          // Get the token account balance
+          try {
+            const userTokenAccount = await getAssociatedTokenAddress(
+              mint,
+              this.provider.wallet.publicKey
+            );
+            
+            const tokenAccountInfo = await this.provider.connection.getTokenAccountBalance(userTokenAccount);
+            const balance = tokenAccountInfo?.value?.uiAmount || 0;
+            
+            // Return the stablecoin info
+            return {
+              id: config.publicKey.toString(),
+              name: configAccount.name,
+              symbol: configAccount.symbol,
+              description: configAccount.description,
+              icon: String.fromCodePoint(configAccount.iconIndex + 0x1F4B0), // Convert index to emoji
+              totalSupply: configAccount.totalSupply.toNumber() / 1_000_000,
+              marketCap: configAccount.totalSupply.toNumber() / 1_000_000, // Simplified, would be calculated based on price
+              collateralRatio: configAccount.collateralizationRatio.toNumber() / 100,
+              collateralType: this.getCollateralTypeName(configAccount.collateralType),
+              price: 1.00, // Simplified, stablecoins are pegged to $1
+              balance: balance,
+              isOwned: true,
+              createdAt: configAccount.createdAt?.toNumber() || Date.now(),
+            };
+          } catch (error) {
+            console.error(`Error fetching token account for ${configAccount.name}:`, error);
+            // Return basic info even if we can't get the balance
+            return {
+              id: config.publicKey.toString(),
+              name: configAccount.name,
+              symbol: configAccount.symbol,
+              description: configAccount.description,
+              icon: String.fromCodePoint(configAccount.iconIndex + 0x1F4B0),
+              totalSupply: configAccount.totalSupply.toNumber() / 1_000_000,
+              marketCap: configAccount.totalSupply.toNumber() / 1_000_000,
+              collateralRatio: configAccount.collateralizationRatio.toNumber() / 100,
+              collateralType: this.getCollateralTypeName(configAccount.collateralType),
+              price: 1.00,
+              balance: 0,
+              isOwned: true,
+              createdAt: configAccount.createdAt?.toNumber() || Date.now(),
+            };
+          }
+        })
+      );
+      
+      return stablecoins;
+    } catch (error) {
+      console.error('Error fetching user stablecoins:', error);
+      return [];
+    }
+  }
+  
+  // Helper function to get collateral type name
+  private getCollateralTypeName(collateralType: any): string {
+    if (collateralType.sol) {
+      return 'JitoSOL';
+    } else if (collateralType.stablebond) {
+      return 'Stablebond';
+    } else if (collateralType.usdc) {
+      return 'USDC';
+    } else {
+      return 'Mixed';
+    }
   }
 }
 

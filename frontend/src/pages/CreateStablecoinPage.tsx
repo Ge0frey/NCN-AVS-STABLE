@@ -46,12 +46,13 @@ export default function CreateStablecoinPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   // Add these hooks
   const { connected } = useWallet();
   const { 
     loading, 
-    error, 
+    error: hookError, 
     stablebonds, 
     fetchStablebonds, 
     createStablecoin 
@@ -75,6 +76,18 @@ export default function CreateStablecoinPage() {
       fetchStablebonds();
     }
   }, [formData.collateralType, fetchStablebonds]);
+
+  // Clear error when changing steps
+  useEffect(() => {
+    setErrorMessage(null);
+  }, [currentStep]);
+
+  // Show hook error if present
+  useEffect(() => {
+    if (hookError) {
+      setErrorMessage(hookError);
+    }
+  }, [hookError]);
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -117,11 +130,12 @@ export default function CreateStablecoinPage() {
   // Submit the form
   const handleSubmit = async () => {
     if (!connected) {
-      alert('Please connect your wallet first');
+      setErrorMessage('Please connect your wallet first');
       return;
     }
     
     setIsSubmitting(true);
+    setErrorMessage(null);
     
     try {
       // Prepare the parameters for creating a stablecoin
@@ -147,16 +161,10 @@ export default function CreateStablecoinPage() {
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating stablecoin:', error);
-      alert(`Failed to create stablecoin: ${error.message}`);
+      setErrorMessage(`Failed to create stablecoin: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Handle success modal close
-  const handleSuccessModalClose = () => {
-    setShowSuccessModal(false);
-    navigate('/stablecoins');
   };
 
   // Validate current step
@@ -340,9 +348,9 @@ export default function CreateStablecoinPage() {
               <div className="flex justify-center py-8">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500"></div>
               </div>
-            ) : error ? (
+            ) : hookError ? (
               <div className="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-400">
-                {error}
+                {hookError}
               </div>
             ) : stablebonds.length === 0 ? (
               <div className="rounded-md bg-amber-50 p-4 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
@@ -558,6 +566,8 @@ export default function CreateStablecoinPage() {
 
   // Success Modal
   const renderSuccessModal = () => {
+    if (!showSuccessModal) return null;
+    
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
@@ -580,7 +590,10 @@ export default function CreateStablecoinPage() {
           
           <div className="flex justify-end space-x-3">
             <button
-              onClick={() => navigate('/stablecoins')}
+              onClick={() => {
+                setShowSuccessModal(false);
+                navigate('/stablecoins');
+              }}
               className="rounded-md bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600"
             >
               View My Stablecoins
@@ -595,6 +608,61 @@ export default function CreateStablecoinPage() {
         </div>
       </div>
     );
+  };
+
+  // Render current step
+  const renderCurrentStep = () => {
+    // If there's an error, show it at the top of the current step
+    const errorAlert = errorMessage ? (
+      <div className="mb-6 rounded-md bg-red-50 p-4 dark:bg-red-900/20">
+        <div className="flex">
+          <div className="flex-shrink-0">
+            <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+            <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+              {errorMessage}
+            </div>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+    switch (currentStep) {
+      case 0:
+        return (
+          <>
+            {errorAlert}
+            {renderBasicInfoStep()}
+          </>
+        );
+      case 1:
+        return (
+          <>
+            {errorAlert}
+            {renderCollateralStep()}
+          </>
+        );
+      case 2:
+        return (
+          <>
+            {errorAlert}
+            {renderParametersStep()}
+          </>
+        );
+      case 3:
+        return (
+          <>
+            {errorAlert}
+            {renderReviewStep()}
+          </>
+        );
+      default:
+        return <div>Unknown step</div>;
+    }
   };
 
   return (
@@ -652,7 +720,7 @@ export default function CreateStablecoinPage() {
 
       {/* Step Content */}
       <div className="card mb-6">
-        {renderStepContent()}
+        {renderCurrentStep()}
       </div>
 
       {/* Navigation Buttons */}

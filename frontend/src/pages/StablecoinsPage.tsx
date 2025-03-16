@@ -1,85 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// Mock data for demonstration
-const mockStablecoins = [
-  {
-    id: '1',
-    name: 'USDF',
-    symbol: 'USDF',
-    icon: '💵',
-    totalSupply: 10000000,
-    marketCap: 10000000,
-    collateralRatio: 175,
-    collateralType: 'JitoSOL',
-    price: 1.00,
-    isOwned: true,
-    createdAt: new Date('2023-10-15').getTime(),
-  },
-  {
-    id: '2',
-    name: 'EURF',
-    symbol: 'EURF',
-    icon: '💶',
-    totalSupply: 5000000,
-    marketCap: 5500000,
-    collateralRatio: 165,
-    collateralType: 'JitoSOL',
-    price: 1.10,
-    isOwned: true,
-    createdAt: new Date('2023-11-20').getTime(),
-  },
-  {
-    id: '3',
-    name: 'GBPF',
-    symbol: 'GBPF',
-    icon: '💷',
-    totalSupply: 3000000,
-    marketCap: 3300000,
-    collateralRatio: 180,
-    collateralType: 'Stablebond',
-    price: 1.10,
-    isOwned: false,
-    createdAt: new Date('2023-12-05').getTime(),
-  },
-  {
-    id: '4',
-    name: 'JPYF',
-    symbol: 'JPYF',
-    icon: '💴',
-    totalSupply: 500000000,
-    marketCap: 3500000,
-    collateralRatio: 170,
-    collateralType: 'Stablebond',
-    price: 0.007,
-    isOwned: false,
-    createdAt: new Date('2024-01-10').getTime(),
-  },
-  {
-    id: '5',
-    name: 'CADF',
-    symbol: 'CADF',
-    icon: '💰',
-    totalSupply: 2500000,
-    marketCap: 2500000,
-    collateralRatio: 160,
-    collateralType: 'Mixed',
-    price: 1.00,
-    isOwned: false,
-    createdAt: new Date('2024-02-15').getTime(),
-  },
-];
+import { useStableFunds } from '../hooks/useStableFunds';
 
 export default function StablecoinsPage() {
   const navigate = useNavigate();
+  const { userStablecoins, loading, error, fetchUserStablecoins } = useStableFunds();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOwned, setFilterOwned] = useState(false);
   const [sortBy, setSortBy] = useState('marketCap');
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
+  // Refresh stablecoins when component mounts
+  useEffect(() => {
+    fetchUserStablecoins();
+  }, [fetchUserStablecoins]);
+
   // Filter and sort stablecoins
-  const filteredStablecoins = mockStablecoins
+  const filteredStablecoins = userStablecoins
     .filter(coin => {
       // Filter by search term
       const matchesSearch = coin.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -184,8 +122,42 @@ export default function StablecoinsPage() {
         </div>
       </div>
 
+      {/* Loading state */}
+      {loading && (
+        <div className="flex justify-center py-12">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-slate-200 border-t-sky-500"></div>
+        </div>
+      )}
+
+      {/* Error state */}
+      {error && !loading && (
+        <div className="mb-6 rounded-md bg-red-50 p-4 dark:bg-red-900/20">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {error}
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={() => fetchUserStablecoins()}
+                  className="rounded-md bg-red-50 px-4 py-2 text-sm font-medium text-red-800 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-200 dark:hover:bg-red-900/40"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* No results */}
-      {filteredStablecoins.length === 0 && (
+      {!loading && !error && filteredStablecoins.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
           <svg xmlns="http://www.w3.org/2000/svg" className="mb-2 h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -204,7 +176,7 @@ export default function StablecoinsPage() {
       )}
 
       {/* Grid View */}
-      {viewMode === 'grid' && filteredStablecoins.length > 0 && (
+      {viewMode === 'grid' && !loading && !error && filteredStablecoins.length > 0 && (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filteredStablecoins.map((coin) => (
             <div key={coin.id} className="card transition-all hover:shadow-md">
@@ -269,7 +241,7 @@ export default function StablecoinsPage() {
       )}
 
       {/* Table View */}
-      {viewMode === 'table' && filteredStablecoins.length > 0 && (
+      {viewMode === 'table' && !loading && !error && filteredStablecoins.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
             <thead className="bg-slate-50 dark:bg-slate-800">

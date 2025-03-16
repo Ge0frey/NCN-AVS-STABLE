@@ -4,6 +4,22 @@ import { AnchorProvider } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 
+export interface UserStablecoin {
+  id: string;
+  name: string;
+  symbol: string;
+  description: string;
+  icon: string;
+  totalSupply: number;
+  marketCap: number;
+  collateralRatio: number;
+  collateralType: string;
+  price: number;
+  balance: number;
+  isOwned: boolean;
+  createdAt: number;
+}
+
 export function useStableFunds() {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -11,22 +27,60 @@ export function useStableFunds() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stablebonds, setStablebonds] = useState<StablebondData[]>([]);
+  const [userStablecoins, setUserStablecoins] = useState<UserStablecoin[]>([]);
 
   // Initialize the client when wallet is connected
   useEffect(() => {
     if (wallet && connection) {
-      const provider = new AnchorProvider(
-        connection,
-        wallet,
-        AnchorProvider.defaultOptions()
-      );
-      
-      const stableFundsClient = new StableFundsClient(provider);
-      setClient(stableFundsClient);
+      try {
+        const provider = new AnchorProvider(
+          connection,
+          wallet,
+          AnchorProvider.defaultOptions()
+        );
+        
+        const stableFundsClient = new StableFundsClient(provider);
+        setClient(stableFundsClient);
+        setError(null);
+      } catch (err) {
+        console.error('Error initializing StableFundsClient:', err);
+        setError('Failed to connect to the Solana blockchain. Please refresh and try again.');
+        setClient(null);
+      }
     } else {
       setClient(null);
     }
+    
+    // Cleanup function
+    return () => {
+      // Any cleanup needed when the component unmounts
+    };
   }, [wallet, connection]);
+
+  // Fetch user's stablecoins
+  const fetchUserStablecoins = useCallback(async () => {
+    if (!client) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const stablecoins = await client.fetchUserStablecoins();
+      setUserStablecoins(stablecoins);
+    } catch (err) {
+      console.error('Error fetching user stablecoins:', err);
+      setError('Failed to fetch stablecoins. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, [client]);
+
+  // Auto-fetch user stablecoins when client changes
+  useEffect(() => {
+    if (client) {
+      fetchUserStablecoins();
+    }
+  }, [client, fetchUserStablecoins]);
 
   // Fetch available stablebonds
   const fetchStablebonds = useCallback(async () => {
@@ -61,6 +115,10 @@ export function useStableFunds() {
       setError(null);
       
       const result = await client.createStablecoin(params);
+      
+      // After creating a stablecoin, refresh the user's stablecoins list
+      await fetchUserStablecoins();
+      
       return result;
     } catch (err) {
       console.error('Error creating stablecoin:', err);
@@ -69,7 +127,7 @@ export function useStableFunds() {
     } finally {
       setLoading(false);
     }
-  }, [client]);
+  }, [client, fetchUserStablecoins]);
 
   // Deposit collateral for an existing stablecoin
   const depositCollateral = useCallback(async (
@@ -131,7 +189,9 @@ export function useStableFunds() {
     loading,
     error,
     stablebonds,
+    userStablecoins,
     fetchStablebonds,
+    fetchUserStablecoins,
     createStablecoin,
     depositCollateral,
     mintStablecoin,
