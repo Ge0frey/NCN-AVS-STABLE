@@ -33,7 +33,15 @@ interface WalletContextProps extends WalletContextState {
 const WalletContext = createContext<WalletContextProps | undefined>(undefined);
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  console.log('WalletProvider: Rendering');
+  // Reduce console logging to avoid excessive output
+  const debug = false;
+  const logDebug = (message: string, data?: any) => {
+    if (debug) {
+      console.log(message, data);
+    }
+  };
+  
+  logDebug('WalletProvider: Rendering');
   
   const wallet = useWallet();
   const [network, setNetwork] = useState<WalletAdapterNetwork>(WalletAdapterNetwork.Devnet);
@@ -43,34 +51,74 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [jitoClient, setJitoClient] = useState<RestakingClient | null>(null);
   const [isJitoEnabled, setIsJitoEnabled] = useState<boolean>(false);
+  const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
 
-  console.log('WalletProvider: State', {
+  logDebug('WalletProvider: State', {
     connected: wallet.connected,
     isInitialized,
     isLoading,
     network,
     hasConnection: !!connection,
     balance,
-    isJitoEnabled
+    isJitoEnabled,
+    connectionAttempts
   });
 
-  // Initialize connection
+  // Initialize connection with retry logic and timeout
   useEffect(() => {
-    console.log('WalletProvider: Initializing connection');
+    let timeoutId: NodeJS.Timeout;
+    let isMounted = true;
+    
+    logDebug('WalletProvider: Initializing connection');
+    
     const initializeConnection = async () => {
+      if (!isMounted) return;
+      
       try {
         const endpoint = clusterApiUrl(network);
         const conn = new Connection(endpoint, 'confirmed');
         
-        // Test connection
-        await conn.getRecentBlockhash();
+        // Test connection with timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(new Error('Connection timeout'));
+          }, 5000);
+        });
+        
+        const connectionPromise = conn.getRecentBlockhash();
+        
+        await Promise.race([connectionPromise, timeoutPromise]);
+        clearTimeout(timeoutId);
+        
+        if (!isMounted) return;
         
         setConnection(conn);
         setIsInitialized(true);
+        setConnectionAttempts(0);
       } catch (error) {
         console.error('Failed to initialize connection:', error);
+        
+        if (!isMounted) return;
+        
+        // Retry with exponential backoff, but only up to 3 times
+        if (connectionAttempts < 3) {
+          const delay = Math.pow(2, connectionAttempts) * 1000;
+          console.log(`Retrying connection in ${delay}ms (attempt ${connectionAttempts + 1}/3)`);
+          
+          setTimeout(() => {
+            if (isMounted) {
+              setConnectionAttempts(prev => prev + 1);
+            }
+          }, delay);
+        } else {
+          // After 3 attempts, set initialized anyway to not get stuck
+          console.log('Maximum connection attempts reached, proceeding anyway');
+          setIsInitialized(true);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -78,16 +126,31 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     initializeConnection();
 
     return () => {
-      console.log('WalletProvider: Cleaning up connection');
+      isMounted = false;
+      clearTimeout(timeoutId);
+      logDebug('WalletProvider: Cleaning up connection');
     };
-  }, [network]);
+  }, [network, connectionAttempts]);
 
-  // Initialize Jito client
+  // Initialize Jito client - with error handling to avoid blocking the app
   useEffect(() => {
+    let isMounted = true;
+    
     const initializeJitoClient = async () => {
+      if (!connection || !isMounted) return;
+      
       try {
-        // Check if NCN features are enabled
-        const features = await api.getFeatureFlags();
+        // Use a timeout for the API call to prevent blocking
+        const timeoutPromise = new Promise<null>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Feature flags request timeout'));
+          }, 3000);
+        });
+        
+        const featuresPromise = api.getFeatureFlags();
+        const features = await Promise.race([featuresPromise, timeoutPromise]);
+        
+        if (!isMounted) return;
         
         if (features) {
           setIsJitoEnabled(features.jitoRestakingEnabled);
@@ -95,24 +158,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           if (features.jitoRestakingEnabled && connection) {
             const client = new RestakingClient(connection);
             setJitoClient(client);
-            console.log('Jito Restaking client initialized successfully');
+            logDebug('Jito Restaking client initialized successfully');
           }
         }
       } catch (error) {
         console.error('Failed to initialize Jito client:', error);
-        setJitoClient(null);
-        setIsJitoEnabled(false);
+        if (isMounted) {
+          setJitoClient(null);
+          setIsJitoEnabled(false);
+        }
       }
     };
     
     if (connection) {
       initializeJitoClient();
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [connection]);
 
   // Update balance when wallet changes
   const refreshBalance = useCallback(async () => {
-    console.log('WalletProvider: Refreshing balance');
+    logDebug('WalletProvider: Refreshing balance');
     if (!wallet.publicKey || !connection) {
       setBalance(0);
       return;
@@ -131,7 +200,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   }, [wallet.publicKey, connection]);
 
   useEffect(() => {
-    console.log('WalletProvider: Wallet connection changed');
+    logDebug('WalletProvider: Wallet connection changed');
     if (wallet.connected) {
       refreshBalance();
     } else {
@@ -147,9 +216,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     
     try {
       // This method can be used by components that need Jito data
-      // It doesn't do anything specific here, but components can call it
-      // to refresh their Jito data
-      console.log('Fetching Jito data...');
+      logDebug('Fetching Jito data...');
     } catch (error) {
       console.error('Error fetching Jito data:', error);
     }

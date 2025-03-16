@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, memo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useWalletContext } from '../../context/WalletContext';
 
@@ -6,13 +6,22 @@ interface ProtectedRouteProps {
   children: ReactNode;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  console.log('ProtectedRoute: Rendering');
+// Use memo to prevent unnecessary re-renders
+const ProtectedRoute = memo(function ProtectedRoute({ children }: ProtectedRouteProps) {
+  // Reduce console logging to avoid excessive output
+  const debug = false;
+  const logDebug = (message: string, data?: any) => {
+    if (debug) {
+      console.log(message, data);
+    }
+  };
+
+  logDebug('ProtectedRoute: Rendering');
   
   const location = useLocation();
   const { connected, isInitialized, isLoading } = useWalletContext();
   
-  console.log('ProtectedRoute: State', { 
+  logDebug('ProtectedRoute: State', { 
     pathname: location.pathname,
     connected, 
     isInitialized, 
@@ -20,12 +29,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   });
 
   useEffect(() => {
-    console.log('ProtectedRoute: Route changed', location.pathname);
+    logDebug('ProtectedRoute: Route changed', location.pathname);
   }, [location.pathname]);
 
   // Only show loading state while initializing
   if (!isInitialized) {
-    console.log('ProtectedRoute: Showing loading state (not initialized)');
+    logDebug('ProtectedRoute: Showing loading state (not initialized)');
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -38,13 +47,13 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Redirect to connect page if wallet is not connected
   if (!connected) {
-    console.log('ProtectedRoute: Redirecting to connect page');
+    logDebug('ProtectedRoute: Redirecting to connect page');
     return <Navigate to="/connect" replace state={{ from: location }} />;
   }
 
   // Show loading state while fetching data
   if (isLoading) {
-    console.log('ProtectedRoute: Showing loading state (loading data)');
+    logDebug('ProtectedRoute: Showing loading state (loading data)');
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
@@ -55,6 +64,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  console.log('ProtectedRoute: Rendering children');
+  logDebug('ProtectedRoute: Rendering children');
   return <>{children}</>;
-} 
+});
+
+export default ProtectedRoute; 
