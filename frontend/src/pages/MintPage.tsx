@@ -1,48 +1,33 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWalletContext } from '../context/WalletContext';
-
-// Mock data for demonstration
-const mockData = {
-  collateralRatio: 185,
-  minCollateralRatio: 130,
-  recommendedRatio: 150,
-  availableCollateral: 12500,
-  stablecoins: [
-    {
-      id: '1',
-      name: 'USDF',
-      symbol: 'USDF',
-      icon: '💵',
-      balance: 1250.75,
-      maxMintable: 8000,
-      collateralRatio: 175,
-    },
-    {
-      id: '2',
-      name: 'EURF',
-      symbol: 'EURF',
-      icon: '💶',
-      balance: 850.25,
-      maxMintable: 7500,
-      collateralRatio: 165,
-    },
-  ],
-};
+import { useStableFunds } from '../hooks/useStableFunds';
 
 export default function MintPage() {
   const navigate = useNavigate();
-  const { balance } = useWalletContext();
+  const { 
+    userStablecoins, 
+    loading, 
+    error, 
+    fetchUserStablecoins,
+    mintStablecoin 
+  } = useStableFunds();
   
   // Form state
   const [selectedStablecoin, setSelectedStablecoin] = useState('');
   const [amount, setAmount] = useState('');
-  const [targetRatio, setTargetRatio] = useState(mockData.recommendedRatio);
+  const [targetRatio, setTargetRatio] = useState(150); // Default recommended ratio
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
   
   // Get selected stablecoin details
-  const stablecoinDetails = mockData.stablecoins.find(coin => coin.id === selectedStablecoin);
+  const stablecoinDetails = userStablecoins.find(coin => coin.id === selectedStablecoin);
+  
+  // Refresh user stablecoins when component mounts
+  useEffect(() => {
+    fetchUserStablecoins();
+  }, [fetchUserStablecoins]);
   
   // Calculate required collateral
   const calculateRequiredCollateral = () => {
@@ -58,9 +43,9 @@ export default function MintPage() {
   const calculateMaxMintable = () => {
     if (!stablecoinDetails) return 0;
     
-    // This is a simplified calculation
-    // In a real app, this would be based on available collateral and target ratio
-    return (mockData.availableCollateral * 100) / targetRatio;
+    // This calculation would ideally be based on real-time data
+    // For now, we'll use a simplified calculation based on the collateral ratio
+    return stablecoinDetails.balance * 10; // Simplified logic
   };
   
   // Handle form submission
@@ -148,7 +133,7 @@ export default function MintPage() {
                   Select Stablecoin to Mint
                 </label>
                 <div className="space-y-4">
-                  {mockData.stablecoins.map((coin) => (
+                  {userStablecoins.map((coin) => (
                     <div
                       key={coin.id}
                       onClick={() => setSelectedStablecoin(coin.id)}
@@ -213,7 +198,7 @@ export default function MintPage() {
                   <input
                     type="range"
                     id="targetRatio"
-                    min={mockData.minCollateralRatio}
+                    min={130}
                     max="300"
                     step="5"
                     value={targetRatio}
@@ -226,8 +211,8 @@ export default function MintPage() {
                   </span>
                 </div>
                 <div className="mt-2 flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                  <span>Min: {mockData.minCollateralRatio}%</span>
-                  <span className="text-sky-600 dark:text-sky-400">Recommended: {mockData.recommendedRatio}%</span>
+                  <span>Min: 130%</span>
+                  <span className="text-sky-600 dark:text-sky-400">Recommended: 150%</span>
                   <span>Max: 300%</span>
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -293,11 +278,11 @@ export default function MintPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-600 dark:text-slate-300">Available Collateral</span>
-                      <span className="font-medium">${mockData.availableCollateral.toLocaleString()}</span>
+                      <span className="font-medium">${stablecoinDetails?.balance.toLocaleString()}</span>
                     </div>
                   </div>
                   
-                  {calculateRequiredCollateral() > mockData.availableCollateral && (
+                  {calculateRequiredCollateral() > stablecoinDetails?.balance && (
                     <div className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-300">
                       <div className="flex">
                         <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -327,7 +312,7 @@ export default function MintPage() {
                     !selectedStablecoin || 
                     !amount || 
                     parseFloat(amount) <= 0 || 
-                    calculateRequiredCollateral() > mockData.availableCollateral ||
+                    calculateRequiredCollateral() > stablecoinDetails?.balance ||
                     isSubmitting
                   }
                   className="btn btn-primary"
@@ -363,13 +348,13 @@ export default function MintPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>The minimum collateralization ratio is {mockData.minCollateralRatio}%</span>
+                  <span>The minimum collateralization ratio is 130%</span>
                 </li>
                 <li className="flex items-start">
                   <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span>We recommend maintaining at least {mockData.recommendedRatio}% for safety</span>
+                  <span>We recommend maintaining at least 150% for safety</span>
                 </li>
                 <li className="flex items-start">
                   <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -386,11 +371,11 @@ export default function MintPage() {
             <div className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-slate-600 dark:text-slate-300">Available Collateral</span>
-                <span className="font-medium">${mockData.availableCollateral.toLocaleString()}</span>
+                <span className="font-medium">${stablecoinDetails?.balance.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600 dark:text-slate-300">Current C-Ratio</span>
-                <span className="font-medium">{mockData.collateralRatio}%</span>
+                <span className="font-medium">{stablecoinDetails?.collateralRatio}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600 dark:text-slate-300">Target C-Ratio</span>
@@ -400,7 +385,7 @@ export default function MintPage() {
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div 
                   className="h-full rounded-full bg-sky-500"
-                  style={{ width: `${Math.min(mockData.collateralRatio / 3, 100)}%` }}
+                  style={{ width: `${Math.min(stablecoinDetails?.collateralRatio / 3, 100)}%` }}
                 ></div>
               </div>
               <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
