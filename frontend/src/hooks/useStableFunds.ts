@@ -90,10 +90,7 @@ export function useStableFunds() {
       setLoading(true);
       setError(null);
       
-      // In a production environment, we would use the real Etherfuse SDK
-      // const bonds = await client.fetchRealStablebonds(connection.rpcEndpoint);
-      
-      // For now, use our mock implementation
+      // Fetch bonds using the client implementation
       const bonds = await client.fetchStablebonds();
       setStablebonds(bonds);
     } catch (err) {
