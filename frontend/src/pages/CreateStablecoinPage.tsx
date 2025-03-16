@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useStableFunds } from '../hooks/useStableFunds';
+import { PublicKey } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 // Define the steps in the creation process
 const STEPS = [
@@ -42,6 +45,17 @@ export default function CreateStablecoinPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+  
+  // Add these hooks
+  const { connected } = useWallet();
+  const { 
+    loading, 
+    error, 
+    stablebonds, 
+    fetchStablebonds, 
+    createStablecoin 
+  } = useStableFunds();
   
   // Form state
   const [formData, setFormData] = useState({
@@ -52,7 +66,15 @@ export default function CreateStablecoinPage() {
     collateralizationRatio: 175,
     initialSupply: 1000,
     icon: '💵',
+    selectedStablebond: null as { bondMint: PublicKey, name: string, symbol: string } | null,
   });
+
+  // Fetch stablebonds when collateral type is selected
+  useEffect(() => {
+    if (formData.collateralType === 'stablebond') {
+      fetchStablebonds();
+    }
+  }, [formData.collateralType, fetchStablebonds]);
 
   // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -94,16 +116,38 @@ export default function CreateStablecoinPage() {
 
   // Submit the form
   const handleSubmit = async () => {
+    if (!connected) {
+      alert('Please connect your wallet first');
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
-      // In a real app, you would send the data to your API here
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      // Prepare the parameters for creating a stablecoin
+      const params = {
+        name: formData.name,
+        symbol: formData.symbol,
+        description: formData.description,
+        iconIndex: parseInt(formData.icon.codePointAt(0)?.toString() || '0') % 10, // Convert emoji to number
+        collateralType: formData.collateralType === 'stablebond' ? 'Stablebond' : 
+                        formData.collateralType === 'jitosol' ? 'SOL' : 'USDC',
+        stablebondMint: formData.selectedStablebond?.bondMint,
+        collateralizationRatio: formData.collateralizationRatio,
+        initialSupply: formData.initialSupply,
+      };
       
+      // Call the createStablecoin function from our hook
+      const { signature } = await createStablecoin(params);
+      
+      // Store the transaction signature for display
+      setTxSignature(signature);
+      
+      // Show success modal
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating stablecoin:', error);
-      // Handle error (show error message)
+      alert(`Failed to create stablecoin: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -286,6 +330,67 @@ export default function CreateStablecoinPage() {
             </div>
           ))}
         </div>
+
+        {/* Add Stablebond selection when stablebond collateral type is selected */}
+        {formData.collateralType === 'stablebond' && (
+          <div className="mt-8">
+            <h3 className="mb-4 text-lg font-medium">Select a Stablebond</h3>
+            
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500"></div>
+              </div>
+            ) : error ? (
+              <div className="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                {error}
+              </div>
+            ) : stablebonds.length === 0 ? (
+              <div className="rounded-md bg-amber-50 p-4 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                No stablebonds available. Please try again later.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {stablebonds.map((bond) => (
+                  <div
+                    key={bond.bondMint.toString()}
+                    onClick={() => handleStablebondSelect(bond)}
+                    className={`cursor-pointer rounded-lg border p-4 transition-all hover:border-sky-500 dark:hover:border-sky-400 ${
+                      formData.selectedStablebond?.bondMint.toString() === bond.bondMint.toString()
+                        ? 'border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-900/20'
+                        : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">{bond.name}</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{bond.symbol}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">${bond.price.toFixed(2)}</p>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          {bond.annualYield.toFixed(2)}% APY
+                        </p>
+                      </div>
+                      <div className="ml-4">
+                        <div className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                          formData.selectedStablebond?.bondMint.toString() === bond.bondMint.toString()
+                            ? 'border-sky-500 bg-sky-500 text-white dark:border-sky-400 dark:bg-sky-400'
+                            : 'border-slate-300 dark:border-slate-600'
+                        }`}>
+                          {formData.selectedStablebond?.bondMint.toString() === bond.bondMint.toString() && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -375,89 +480,116 @@ export default function CreateStablecoinPage() {
     return (
       <div className="space-y-6">
         <p className="text-slate-600 dark:text-slate-300">
-          Review your stablecoin details before creation. Once created, some parameters cannot be changed.
+          Review your stablecoin details before creating it. Once created, some properties cannot be changed.
         </p>
-
-        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-            <div className="flex items-center">
-              <div className="mr-3 text-3xl">{formData.icon}</div>
+        
+        <div className="rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="border-b border-slate-200 p-4 dark:border-slate-700">
+            <h3 className="text-lg font-medium">Basic Information</h3>
+          </div>
+          <div className="p-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <h3 className="text-lg font-bold">{formData.name}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{formData.symbol}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Name</p>
+                <p className="font-medium">{formData.name}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Symbol</p>
+                <p className="font-medium">{formData.symbol}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Description</p>
+                <p className="font-medium">{formData.description}</p>
+              </div>
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Icon</p>
+                <p className="text-2xl">{formData.icon}</p>
               </div>
             </div>
           </div>
           
+          <div className="border-b border-t border-slate-200 p-4 dark:border-slate-700">
+            <h3 className="text-lg font-medium">Collateral</h3>
+          </div>
           <div className="p-4">
-            <dl className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-sm text-slate-500 dark:text-slate-400">Collateral Type</dt>
-                  <dd className="font-medium">{selectedCollateral?.name || 'Not selected'}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-slate-500 dark:text-slate-400">Collateralization Ratio</dt>
-                  <dd className="font-medium">{formData.collateralizationRatio}%</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-slate-500 dark:text-slate-400">Initial Supply</dt>
-                  <dd className="font-medium">{formData.initialSupply} {formData.symbol}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-slate-500 dark:text-slate-400">Collateral Required</dt>
-                  <dd className="font-medium">{((formData.initialSupply * formData.collateralizationRatio) / 100).toFixed(2)} USD</dd>
-                </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Type</p>
+                <p className="font-medium">{selectedCollateral?.name}</p>
               </div>
               
-              {formData.description && (
+              {formData.collateralType === 'stablebond' && formData.selectedStablebond && (
                 <div>
-                  <dt className="text-sm text-slate-500 dark:text-slate-400">Description</dt>
-                  <dd className="font-medium">{formData.description}</dd>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Selected Stablebond</p>
+                  <p className="font-medium">{formData.selectedStablebond.name} ({formData.selectedStablebond.symbol})</p>
                 </div>
               )}
-            </dl>
+              
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Collateralization Ratio</p>
+                <p className="font-medium">{formData.collateralizationRatio}%</p>
+              </div>
+            </div>
           </div>
-        </div>
-
-        <div className="rounded-lg bg-amber-50 p-4 dark:bg-amber-900/20">
-          <h3 className="mb-2 flex items-center font-medium text-amber-800 dark:text-amber-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Important Information
-          </h3>
-          <p className="text-sm text-amber-800 dark:text-amber-300">
-            By creating this stablecoin, you agree to maintain the collateralization ratio above the minimum threshold. 
-            If the ratio falls below the minimum, your stablecoin may be subject to liquidation.
-          </p>
+          
+          <div className="border-b border-t border-slate-200 p-4 dark:border-slate-700">
+            <h3 className="text-lg font-medium">Supply</h3>
+          </div>
+          <div className="p-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Initial Supply</p>
+                <p className="font-medium">{formData.initialSupply.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
   };
 
+  // Add a function to handle stablebond selection
+  const handleStablebondSelect = (stablebond) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedStablebond: stablebond
+    }));
+  };
+
   // Success Modal
   const renderSuccessModal = () => {
-    if (!showSuccessModal) return null;
-    
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
         <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
           <h3 className="mb-2 text-xl font-bold">Stablecoin Created!</h3>
           <p className="mb-4 text-slate-600 dark:text-slate-300">
-            Your {formData.name} ({formData.symbol}) stablecoin has been successfully created with an initial supply of {formData.initialSupply} tokens.
+            Your stablecoin has been successfully created and is now available in your wallet.
           </p>
-          <div className="flex justify-end">
+          
+          {txSignature && (
+            <div className="mb-4 overflow-hidden rounded-md bg-slate-100 p-3 dark:bg-slate-700">
+              <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Transaction Signature:</p>
+              <p className="overflow-x-auto text-sm font-mono">{txSignature}</p>
+            </div>
+          )}
+          
+          <div className="flex justify-end space-x-3">
             <button
-              onClick={handleSuccessModalClose}
-              className="btn btn-primary"
+              onClick={() => navigate('/stablecoins')}
+              className="rounded-md bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600"
             >
               View My Stablecoins
+            </button>
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="rounded-md border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              Close
             </button>
           </div>
         </div>
