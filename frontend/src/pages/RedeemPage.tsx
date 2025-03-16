@@ -1,48 +1,48 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWalletContext } from '../context/WalletContext';
-
-// Mock data for demonstration
-const mockData = {
-  collateralRatio: 185,
-  stablecoins: [
-    {
-      id: '1',
-      name: 'USDF',
-      symbol: 'USDF',
-      icon: '💵',
-      balance: 1250.75,
-      collateralType: 'JitoSOL',
-      collateralIcon: '🔷',
-      collateralRatio: 175,
-      conversionRate: 0.95, // 1 JitoSOL = 0.95 SOL
-    },
-    {
-      id: '2',
-      name: 'EURF',
-      symbol: 'EURF',
-      icon: '💶',
-      balance: 850.25,
-      collateralType: 'Stablebond',
-      collateralIcon: '🔒',
-      collateralRatio: 165,
-      conversionRate: 1, // 1 Stablebond = $1
-    },
-  ],
-};
+import { useStableFunds } from '../hooks/useStableFunds';
 
 export default function RedeemPage() {
   const navigate = useNavigate();
-  const { balance } = useWalletContext();
+  const { 
+    userStablecoins, 
+    loading, 
+    error, 
+    fetchUserStablecoins
+  } = useStableFunds();
   
   // Form state
   const [selectedStablecoin, setSelectedStablecoin] = useState('');
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [txSignature, setTxSignature] = useState<string | null>(null);
+  
+  // Refresh user stablecoins when component mounts
+  useEffect(() => {
+    fetchUserStablecoins();
+  }, [fetchUserStablecoins]);
   
   // Get selected stablecoin details
-  const stablecoinDetails = mockData.stablecoins.find(coin => coin.id === selectedStablecoin);
+  const stablecoinDetails = userStablecoins.find(coin => coin.id === selectedStablecoin);
+  
+  // Calculate average collateral ratio for all stablecoins
+  const averageCollateralRatio = userStablecoins.length > 0 
+    ? userStablecoins.reduce((sum, coin) => sum + coin.collateralRatio, 0) / userStablecoins.length 
+    : 150;
+    
+  // Calculate new collateral ratio after redemption (simplified calculation)
+  const calculateNewCollateralRatio = () => {
+    if (!amount || !stablecoinDetails) return averageCollateralRatio;
+    
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) return averageCollateralRatio;
+    
+    // This is a simplified calculation - in a real app this would be more complex
+    // For now, we'll just add 5% for demonstration purposes
+    return averageCollateralRatio + 5;
+  };
   
   // Calculate collateral to receive
   const calculateCollateralToReceive = () => {
@@ -61,7 +61,8 @@ export default function RedeemPage() {
     const collateralAmount = calculateCollateralToReceive();
     if (!stablecoinDetails) return 0;
     
-    return collateralAmount * stablecoinDetails.conversionRate;
+    // In a real implementation, this would use actual conversion rates
+    return collateralAmount * 0.95; // Simplified conversion rate
   };
   
   // Handle form submission
@@ -72,16 +73,33 @@ export default function RedeemPage() {
       return;
     }
     
+    if (!stablecoinDetails) {
+      setErrorMessage("Stablecoin details not found. Please try again.");
+      return;
+    }
+    
     setIsSubmitting(true);
+    setErrorMessage(null);
     
     try {
-      // In a real app, you would send the transaction to your API/blockchain here
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      // In a real implementation, we would call an API endpoint or blockchain function
+      // For now, we'll simulate the successful redemption
+      console.log(`Redeeming ${amount} ${stablecoinDetails.symbol} for ${calculateCollateralToReceive().toFixed(4)} ${stablecoinDetails.collateralType}`);
       
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Set a fake transaction signature for display
+      setTxSignature("SimulatedTxSignature" + Date.now().toString());
+      
+      // Show success modal
       setShowSuccessModal(true);
+      
+      // Refetch stablecoins after redemption
+      await fetchUserStablecoins();
     } catch (error) {
       console.error('Error redeeming stablecoin:', error);
-      // Handle error (show error message)
+      setErrorMessage("Failed to redeem stablecoin. Please try again later.");
     } finally {
       setIsSubmitting(false);
     }
@@ -148,7 +166,7 @@ export default function RedeemPage() {
                   Select Stablecoin to Redeem
                 </label>
                 <div className="space-y-4">
-                  {mockData.stablecoins.map((coin) => (
+                  {userStablecoins.map((coin) => (
                     <div
                       key={coin.id}
                       onClick={() => setSelectedStablecoin(coin.id)}
@@ -189,7 +207,8 @@ export default function RedeemPage() {
                         <div>
                           <p className="text-xs text-slate-500 dark:text-slate-400">Collateral Type</p>
                           <p className="font-medium">
-                            {coin.collateralIcon} {coin.collateralType}
+                            {coin.collateralType === 'JitoSOL' ? '🔷' : 
+                             coin.collateralType === 'Stablebond' ? '🔒' : '💰'} {coin.collateralType}
                           </p>
                         </div>
                         <div>
@@ -242,6 +261,18 @@ export default function RedeemPage() {
                   </p>
                 )}
               </div>
+              
+              {/* Show error message if any */}
+              {errorMessage && (
+                <div className="mb-6 rounded-md bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-300">
+                  <div className="flex">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="mr-2 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>{errorMessage}</span>
+                  </div>
+                </div>
+              )}
               
               {/* Redemption Summary */}
               {selectedStablecoin && amount && parseFloat(amount) > 0 && (
@@ -359,15 +390,14 @@ export default function RedeemPage() {
             <div className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-slate-600 dark:text-slate-300">Current C-Ratio</span>
-                <span className="font-medium">{mockData.collateralRatio}%</span>
+                <span className="font-medium">{averageCollateralRatio.toFixed(2)}%</span>
               </div>
               
               {selectedStablecoin && amount && parseFloat(amount) > 0 && stablecoinDetails && (
                 <div className="flex justify-between">
                   <span className="text-slate-600 dark:text-slate-300">After Redemption</span>
                   <span className="font-medium text-green-500 dark:text-green-400">
-                    {/* This is a simplified calculation that would be more complex in a real app */}
-                    {(mockData.collateralRatio + 5).toFixed(2)}%
+                    {calculateNewCollateralRatio().toFixed(2)}%
                   </span>
                 </div>
               )}
@@ -375,7 +405,7 @@ export default function RedeemPage() {
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div 
                   className="h-full rounded-full bg-sky-500"
-                  style={{ width: `${Math.min(mockData.collateralRatio / 3, 100)}%` }}
+                  style={{ width: `${Math.min(averageCollateralRatio / 3, 100)}%` }}
                 ></div>
               </div>
               <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
