@@ -19,12 +19,16 @@
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@solana/web3.js": "^1.98.0",
     "@tailwindcss/vite": "^4.0.12",
+    "buffer": "^6.0.3",
     "framer-motion": "^12.4.11",
+    "process": "^0.11.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.3.0",
     "recharts": "^2.15.1",
-    "tailwindcss": "^4.0.12"
+    "stream-browserify": "^3.0.0",
+    "tailwindcss": "^4.0.12",
+    "util": "^0.12.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",
@@ -37,6 +41,7 @@
     "globals": "^15.15.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.24.1",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "vite-plugin-node-polyfills": "^0.23.0"
   }
 }
