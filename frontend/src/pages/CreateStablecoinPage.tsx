@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStableFunds } from '../hooks/useStableFunds';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
+import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 
 // Define the steps in the creation process
 const STEPS = [
@@ -163,7 +164,7 @@ export default function CreateStablecoinPage() {
         stablebondMint: formData.selectedStablebond?.bondMint,
         collateralizationRatio: formData.collateralizationRatio,
         initialSupply: formData.initialSupply,
-      };
+      } as StablecoinParams;
       
       // Call the createStablecoin function from our hook
       const { signature } = await createStablecoin(params);
@@ -204,7 +205,7 @@ export default function CreateStablecoinPage() {
       case 1: // Collateral Selection
         // For stablebond type, require a selected stablebond
         if (formData.collateralType === 'stablebond') {
-          return formData.collateralType !== '' && formData.selectedStablebond !== null;
+          return Boolean(formData.selectedStablebond);
         }
         return formData.collateralType !== '';
       case 2: // Parameters
@@ -372,19 +373,22 @@ export default function CreateStablecoinPage() {
 
         {/* Add Stablebond selection when stablebond collateral type is selected */}
         {formData.collateralType === 'stablebond' && (
-          <div className="mt-8">
-            <h3 className="mb-4 text-lg font-medium">Select a Stablebond</h3>
+          <div className="mt-8 backdrop-blur-sm bg-slate-800/40 rounded-xl p-6 border border-slate-700/50 shadow-lg">
+            <h3 className="mb-5 text-base font-medium text-slate-200 flex items-center">
+              <span className="mr-2 text-lg">🔒</span>
+              Select a Stablebond
+            </h3>
             
             {loading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500"></div>
-                <span className="ml-2">Loading available stablebonds...</span>
+              <div className="flex justify-center py-6">
+                <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-sky-400"></div>
+                <span className="ml-2 text-sm text-slate-300">Loading available stablebonds...</span>
               </div>
             ) : hookError ? (
-              <div className="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+              <div className="rounded-md bg-red-900/20 p-3 text-red-400 text-sm">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <svg className="h-4 w-4 text-red-400" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -393,13 +397,13 @@ export default function CreateStablecoinPage() {
                     <div className="mt-2 flex space-x-3">
                       <button
                         onClick={() => fetchStablebonds()}
-                        className="rounded bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+                        className="rounded bg-red-900/30 px-2 py-1 text-xs font-semibold text-red-300 hover:bg-red-900/50"
                       >
                         Try Again
                       </button>
                       <button
                         onClick={() => handleCollateralSelect('jitosol')}
-                        className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        className="rounded bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-300 hover:bg-slate-700"
                       >
                         Use JitoSOL Instead
                       </button>
@@ -408,10 +412,10 @@ export default function CreateStablecoinPage() {
                 </div>
               </div>
             ) : stablebonds.length === 0 ? (
-              <div className="rounded-md bg-amber-50 p-4 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+              <div className="rounded-md bg-amber-900/20 p-3 text-amber-400 text-sm">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                    <svg className="h-4 w-4 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                   </div>
@@ -420,7 +424,7 @@ export default function CreateStablecoinPage() {
                     <div className="mt-2">
                       <button
                         onClick={() => handleCollateralSelect('jitosol')}
-                        className="rounded bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+                        className="rounded bg-amber-900/30 px-2 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-900/50"
                       >
                         Use JitoSOL Instead
                       </button>
@@ -429,39 +433,39 @@ export default function CreateStablecoinPage() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {stablebonds.map((bond) => (
                   <div
                     key={bond.bondMint.toString()}
                     onClick={() => handleStablebondSelect(bond)}
-                    className={`cursor-pointer rounded-lg border p-4 transition-all hover:border-sky-500 dark:hover:border-sky-400 ${
+                    className={`cursor-pointer rounded-lg transition-all backdrop-blur-sm ${
                       formData.selectedStablebond?.bondMint.toString() === bond.bondMint.toString()
-                        ? 'border-sky-500 bg-sky-50 dark:border-sky-400 dark:bg-sky-900/20'
-                        : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
+                        ? 'bg-slate-700/70 border border-sky-400/80 shadow-md shadow-sky-500/10'
+                        : 'bg-slate-800/30 border border-slate-700/50 hover:border-sky-600/30 hover:bg-slate-700/40'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">{bond.name}</h4>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{bond.symbol}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">${bond.price.toFixed(2)}</p>
-                        <p className="text-sm text-green-600 dark:text-green-400">
-                          {bond.annualYield.toFixed(2)}% APY
-                        </p>
-                      </div>
-                      <div className="ml-4">
-                        <div className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                    <div className="p-3 flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`flex h-5 w-5 items-center justify-center rounded-full ${
                           formData.selectedStablebond?.bondMint.toString() === bond.bondMint.toString()
-                            ? 'border-sky-500 bg-sky-500 text-white dark:border-sky-400 dark:bg-sky-400'
-                            : 'border-slate-300 dark:border-slate-600'
+                            ? 'bg-sky-500 text-white'
+                            : 'border border-slate-600'
                         }`}>
                           {formData.selectedStablebond?.bondMint.toString() === bond.bondMint.toString() && (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
                           )}
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-sm text-slate-200">{bond.name}</h4>
+                          <p className="text-xs text-slate-400">{bond.symbol}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="text-xs font-medium text-slate-300">${bond.price.toFixed(2)}</div>
+                        <div className="bg-green-900/30 text-green-400 text-xs font-medium px-1.5 py-0.5 rounded">
+                          {bond.annualYield.toFixed(2)}% APY
                         </div>
                       </div>
                     </div>
@@ -629,7 +633,7 @@ export default function CreateStablecoinPage() {
   };
 
   // Add a function to handle stablebond selection
-  const handleStablebondSelect = (stablebond) => {
+  const handleStablebondSelect = (stablebond: StablebondData) => {
     console.log('Selected stablebond:', stablebond);
     console.log('Mint address:', stablebond.bondMint.toString());
     
