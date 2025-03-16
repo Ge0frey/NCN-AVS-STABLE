@@ -32,7 +32,7 @@ const DEFAULT_IDL = {
 };
 
 // Define the PROGRAM_ID as a string first to avoid potential PublicKey initialization issues
-const PROGRAM_ID_STRING = '9SDa7sMDqCDjSGQyjhMHHde6bvENWS68HVzQqqsAhrus';
+const PROGRAM_ID_STRING = '97XJBATGaXqBSVRQYszL7pr4RP46Uv9KH6FzcLx3zgd8';
 export const PROGRAM_ID = new PublicKey(PROGRAM_ID_STRING);
 
 // Import the IDL safely with error handling
