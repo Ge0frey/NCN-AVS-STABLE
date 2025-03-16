@@ -74,9 +74,11 @@ export default function CreateStablecoinPage() {
   useEffect(() => {
     if (formData.collateralType === 'stablebond') {
       setErrorMessage(null); // Clear any previous errors
+      setFormData(prev => ({ ...prev, selectedStablebond: null })); // Reset selected stablebond
+      
       fetchStablebonds().catch(err => {
         console.error("Failed to fetch stablebonds:", err);
-        setErrorMessage("Failed to fetch available stablebonds. Please try again later.");
+        setErrorMessage("Failed to fetch available stablebonds. Please try again later or select a different collateral type.");
       });
     }
   }, [formData.collateralType, fetchStablebonds]);
@@ -103,10 +105,12 @@ export default function CreateStablecoinPage() {
   const handleCollateralSelect = (collateralId: string) => {
     const selectedCollateral = COLLATERAL_OPTIONS.find(option => option.id === collateralId);
     
+    // Reset selected stablebond when changing collateral type
     setFormData(prev => ({ 
       ...prev, 
       collateralType: collateralId,
-      collateralizationRatio: selectedCollateral?.recommendedRatio || 175
+      collateralizationRatio: selectedCollateral?.recommendedRatio || 175,
+      selectedStablebond: null
     }));
   };
 
@@ -138,6 +142,12 @@ export default function CreateStablecoinPage() {
       return;
     }
     
+    // Extra validation for stablebond collateral type
+    if (formData.collateralType === 'stablebond' && !formData.selectedStablebond) {
+      setErrorMessage('Please select a stablebond first');
+      return;
+    }
+    
     setIsSubmitting(true);
     setErrorMessage(null);
     
@@ -165,7 +175,20 @@ export default function CreateStablecoinPage() {
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating stablecoin:', error);
-      setErrorMessage(`Failed to create stablecoin: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : (error as any)?.message || 'Unknown error';
+        
+      // Extract more readable error if possible
+      let displayError = errorMessage;
+      if (errorMessage.includes('Transaction simulation failed')) {
+        const match = errorMessage.match(/Message: (.*?)(?=\. Logs:|\n|$)/);
+        if (match && match[1]) {
+          displayError = match[1].trim();
+        }
+      }
+      
+      setErrorMessage(`Failed to create stablecoin: ${displayError}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -367,12 +390,18 @@ export default function CreateStablecoinPage() {
                   </div>
                   <div className="ml-3">
                     <p>{hookError}</p>
-                    <div className="mt-2">
+                    <div className="mt-2 flex space-x-3">
                       <button
                         onClick={() => fetchStablebonds()}
                         className="rounded bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
                       >
                         Try Again
+                      </button>
+                      <button
+                        onClick={() => handleCollateralSelect('jitosol')}
+                        className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                      >
+                        Use JitoSOL Instead
                       </button>
                     </div>
                   </div>
@@ -387,7 +416,15 @@ export default function CreateStablecoinPage() {
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <p>No stablebonds available. Please try again later or select a different collateral type.</p>
+                    <p>No stablebonds are currently available. Please select a different collateral type.</p>
+                    <div className="mt-2">
+                      <button
+                        onClick={() => handleCollateralSelect('jitosol')}
+                        className="rounded bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50"
+                      >
+                        Use JitoSOL Instead
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -551,7 +588,7 @@ export default function CreateStablecoinPage() {
             </div>
           </div>
           
-          <div className="border-b border-t border-slate-200 p-4 dark:border-slate-700">
+          <div className="border-b border-slate-200 p-4 dark:border-slate-700">
             <h3 className="text-lg font-medium">Collateral</h3>
           </div>
           <div className="p-4">
@@ -593,9 +630,23 @@ export default function CreateStablecoinPage() {
 
   // Add a function to handle stablebond selection
   const handleStablebondSelect = (stablebond) => {
+    console.log('Selected stablebond:', stablebond);
+    console.log('Mint address:', stablebond.bondMint.toString());
+    
+    // Explicitly create a clone of the bond object to prevent reference issues
+    const selectedBond = {
+      bondMint: stablebond.bondMint,
+      name: stablebond.name,
+      symbol: stablebond.symbol,
+      price: stablebond.price,
+      maturityTime: stablebond.maturityTime,
+      issuanceDate: stablebond.issuanceDate,
+      annualYield: stablebond.annualYield
+    };
+    
     setFormData(prev => ({
       ...prev,
-      selectedStablebond: stablebond
+      selectedStablebond: selectedBond
     }));
   };
 
