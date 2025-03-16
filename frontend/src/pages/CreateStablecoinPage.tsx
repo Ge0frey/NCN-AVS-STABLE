@@ -73,7 +73,11 @@ export default function CreateStablecoinPage() {
   // Fetch stablebonds when collateral type is selected
   useEffect(() => {
     if (formData.collateralType === 'stablebond') {
-      fetchStablebonds();
+      setErrorMessage(null); // Clear any previous errors
+      fetchStablebonds().catch(err => {
+        console.error("Failed to fetch stablebonds:", err);
+        setErrorMessage("Failed to fetch available stablebonds. Please try again later.");
+      });
     }
   }, [formData.collateralType, fetchStablebonds]);
 
@@ -175,6 +179,10 @@ export default function CreateStablecoinPage() {
                formData.symbol.trim() !== '' && 
                formData.symbol.length <= 5;
       case 1: // Collateral Selection
+        // For stablebond type, require a selected stablebond
+        if (formData.collateralType === 'stablebond') {
+          return formData.collateralType !== '' && formData.selectedStablebond !== null;
+        }
         return formData.collateralType !== '';
       case 2: // Parameters
         return formData.collateralizationRatio >= 130 && 
@@ -347,14 +355,41 @@ export default function CreateStablecoinPage() {
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-500"></div>
+                <span className="ml-2">Loading available stablebonds...</span>
               </div>
             ) : hookError ? (
               <div className="rounded-md bg-red-50 p-4 text-red-700 dark:bg-red-900/20 dark:text-red-400">
-                {hookError}
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p>{hookError}</p>
+                    <div className="mt-2">
+                      <button
+                        onClick={() => fetchStablebonds()}
+                        className="rounded bg-red-50 px-2 py-1 text-xs font-semibold text-red-800 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : stablebonds.length === 0 ? (
               <div className="rounded-md bg-amber-50 p-4 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-                No stablebonds available. Please try again later.
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p>No stablebonds available. Please try again later or select a different collateral type.</p>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-3">
