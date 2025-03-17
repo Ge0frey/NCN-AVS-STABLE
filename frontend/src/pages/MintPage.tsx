@@ -81,8 +81,6 @@ export default function MintPage() {
   const calculateMaxMintable = (coin) => {
     if (!coin) return 0;
     
-    // This is a simplified calculation based on available data
-    // In a real app, this would be more complex based on collateral value and ratio
     const collateralAmount = coin.collateralAmount || coin.balance * 1.5; // Fallback calculation
     const collateralRatio = coin.collateralRatio || 150; // Default to 150% if not specified
     
@@ -199,21 +197,15 @@ export default function MintPage() {
   const renderSuccessModal = () => {
     if (!showSuccessModal) return null;
     
-    // Determine if this is a mock signature
-    // First check if we have a flag in session storage
     const isMockSignatureFromStorage = txSignature ? 
       sessionStorage.getItem(`tx-${txSignature}`) === 'mock' : false;
     
-    // If we don't have a flag, check if the signature is a valid Solana signature format
-    // This way we can handle both old and new signature formats
     const isMockSignature = isMockSignatureFromStorage || 
       (txSignature && !isValidTransactionSignature(txSignature));
     
-    // Generate explorer URL for the transaction if it's a real signature
     const explorerUrl = isMockSignature || !txSignature ? 
       null : getTransactionExplorerUrl(txSignature);
     
-    // Function to copy the signature to clipboard
     const copyToClipboard = () => {
       if (txSignature) {
         navigator.clipboard.writeText(txSignature)

@@ -65,7 +65,6 @@ export async function getFeatureFlags() {
     return await fetchAPI<{ncnEnabled: boolean; jitoRestakingEnabled: boolean}>('/features');
   } catch (error) {
     console.warn('Failed to fetch feature flags, using defaults:', error);
-    // Provide fallback defaults if API fails
     return {
       ncnEnabled: true,
       jitoRestakingEnabled: false // Disable Jito as fallback to avoid further errors

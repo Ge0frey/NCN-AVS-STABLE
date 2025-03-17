@@ -160,7 +160,6 @@ class Logger {
     }
   }
   
-  // Get all logs from local storage (useful for debugging)
   getAllLocalLogs(): LogEntry[] {
     try {
       const logsJson = localStorage.getItem(this.localStorageKey) || '[]';

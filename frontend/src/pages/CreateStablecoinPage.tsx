@@ -218,10 +218,8 @@ export default function CreateStablecoinPage() {
     setErrorMessage(null);
     
     // Generate a unique identifier for the stablecoin
-    // This will be used as fallback if the transaction fails
     const uniqueId = `stablecoin-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     
-    // Log the start of the stablecoin creation attempt
     logger.info('STABLECOIN_CREATION', 'Stablecoin creation started', {
       name: formData.name,
       symbol: formData.symbol,
@@ -312,8 +310,6 @@ export default function CreateStablecoinPage() {
         stack: error instanceof Error ? error.stack : undefined
       });
       
-      // Create a fallback stablecoin object to simulate success
-      // This maintains the user experience regardless of transaction success
       const fallbackStablecoin = {
         id: uniqueId,
         name: formData.name,
@@ -331,18 +327,14 @@ export default function CreateStablecoinPage() {
         createdAt: Date.now(),
       };
       
-      // Use two methods to ensure the fallback stablecoin is saved:
       
-      // 1. Directly add the fallback stablecoin using the hook method
       addFallbackStablecoin(fallbackStablecoin);
       
-      // 2. Dispatch an event as a backup mechanism
       const fallbackEvent = new CustomEvent('fallback-stablecoin-created', { 
         detail: { stablecoin: fallbackStablecoin } 
       });
       window.dispatchEvent(fallbackEvent);
       
-      // Log the fallback stablecoin creation
       logger.stablecoinOperation('CREATION_FALLBACK', true, {
         stablecoin: fallbackStablecoin,
         method: 'fallback',
@@ -350,24 +342,19 @@ export default function CreateStablecoinPage() {
         originalError: error instanceof Error ? error.message : String(error)
       });
       
-      // Generate a realistic-looking Solana transaction signature for the mock transaction
       const mockSignature = generateMockTransactionSignature();
       setTxSignature(mockSignature);
       
-      // Store a flag indicating this is a mock transaction
       sessionStorage.setItem(`tx-${mockSignature}`, 'mock');
       
-      // Immediately refresh the user's stablecoins list
       fetchUserStablecoins();
       
-      // Show the success modal regardless of error
       showSuccessModalAndClearErrors();
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Validate current step
   const isCurrentStepValid = () => {
     switch (currentStep) {
       case 0: // Basic Information
@@ -814,7 +801,6 @@ export default function CreateStablecoinPage() {
     console.log('Mint address:', stablebond.bondMint.toString());
     
     try {
-      // Explicitly create a clone of the bond object to prevent reference issues
       const selectedBond = {
         bondMint: new PublicKey(stablebond.bondMint.toString()), // Create a new PublicKey instance
         name: stablebond.name,
@@ -842,31 +828,24 @@ export default function CreateStablecoinPage() {
   const renderSuccessModal = () => {
     if (!showSuccessModal) return null;
     
-    // Always ensure error message is cleared when showing success modal
     if (errorMessage) {
       setErrorMessage(null);
     }
     
-    // Determine if this is a mock signature
-    // First check if we have a flag in session storage
+    
     const isMockSignatureFromStorage = txSignature ? 
       sessionStorage.getItem(`tx-${txSignature}`) === 'mock' : false;
     
-    // If we don't have a flag, check if the signature is a valid Solana signature format
-    // This way we can handle both old and new signature formats
     const isMockSignature = isMockSignatureFromStorage || 
       (txSignature && !isValidTransactionSignature(txSignature));
     
-    // Generate explorer URL for the transaction if it's a real signature
     const explorerUrl = isMockSignature || !txSignature ? 
       null : getTransactionExplorerUrl(txSignature);
 
-    // Function to copy the signature to clipboard
     const copyToClipboard = () => {
       if (txSignature) {
         navigator.clipboard.writeText(txSignature)
           .then(() => {
-            // Show a temporary message indicating it was copied
             const el = document.getElementById('copy-message');
             if (el) {
               el.classList.remove('hidden');

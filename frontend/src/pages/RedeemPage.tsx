@@ -39,8 +39,6 @@ export default function RedeemPage() {
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) return averageCollateralRatio;
     
-    // This is a simplified calculation - in a real app this would be more complex
-    // For now, we'll just add 5% for demonstration purposes
     return averageCollateralRatio + 5;
   };
   
@@ -52,7 +50,6 @@ export default function RedeemPage() {
     if (isNaN(numericAmount)) return 0;
     
     // This is a simplified calculation
-    // In a real app, this would be based on the current collateral ratio and price
     return (numericAmount * 100) / stablecoinDetails.collateralRatio;
   };
   
@@ -61,7 +58,6 @@ export default function RedeemPage() {
     const collateralAmount = calculateCollateralToReceive();
     if (!stablecoinDetails) return 0;
     
-    // In a real implementation, this would use actual conversion rates
     return collateralAmount * 0.95; // Simplified conversion rate
   };
   
@@ -82,20 +78,16 @@ export default function RedeemPage() {
     setErrorMessage(null);
     
     try {
-      // In a real implementation, we would call an API endpoint or blockchain function
-      // For now, we'll simulate the successful redemption
       console.log(`Redeeming ${amount} ${stablecoinDetails.symbol} for ${calculateCollateralToReceive().toFixed(4)} ${stablecoinDetails.collateralType}`);
       
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Set a fake transaction signature for display
       setTxSignature("SimulatedTxSignature" + Date.now().toString());
       
       // Show success modal
       setShowSuccessModal(true);
       
-      // Refetch stablecoins after redemption
       await fetchUserStablecoins();
     } catch (error) {
       console.error('Error redeeming stablecoin:', error);
@@ -105,7 +97,6 @@ export default function RedeemPage() {
     }
   };
   
-  // Handle success modal close
   const handleSuccessModalClose = () => {
     setShowSuccessModal(false);
     navigate('/dashboard');

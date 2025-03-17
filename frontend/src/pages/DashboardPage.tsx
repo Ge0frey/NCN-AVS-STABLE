@@ -57,10 +57,7 @@ export default function DashboardPage() {
       setIsPageLoading(true);
       
       try {
-        // In a real application, you would fetch all this data from your API
-        // For now, we'll use the wallet balance and some placeholder data
         
-        // Get user positions from Jito Restaking if wallet is connected
         let jitoSolHoldings = 0;
         if (connected && publicKey) {
           try {
@@ -75,11 +72,11 @@ export default function DashboardPage() {
         setDashboardData({
           walletBalance: balance,
           jitoSolHoldings,
-          stablebondHoldings: 0, // This would come from your stablecoin contract
-          ownedStablecoins: [], // This would come from your stablecoin contract
-          collateralizationRatio: 0, // This would be calculated based on real data
-          recentActivity: [], // This would come from transaction history
-          networkStatus: 'Healthy', // This could come from a network status endpoint
+          stablebondHoldings: 0, 
+          ownedStablecoins: [], 
+          collateralizationRatio: 0, 
+          recentActivity: [], 
+          networkStatus: 'Healthy', 
         });
       } catch (error) {
         console.error('Failed to load dashboard data:', error);

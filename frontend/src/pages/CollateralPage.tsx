@@ -63,10 +63,6 @@ export default function CollateralPage() {
       setIsLoading(true);
       
       try {
-        // In a real application, you would fetch all this data from your API
-        // For now, we'll use placeholder data with real prices if available
-        
-        // Get user positions from Jito Restaking if wallet is connected
         let jitoSolBalance = 0;
         if (connected && publicKey) {
           try {

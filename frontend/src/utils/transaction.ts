@@ -9,13 +9,10 @@ const SOLANA_CLUSTER = process.env.REACT_APP_SOLANA_CLUSTER || 'devnet';
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
 /**
- * Generates a random Solana-like transaction signature
- * Solana signatures are 88 characters long and base58 encoded
- * @returns A random string that looks like a Solana transaction signature
+ * @returns A
  */
 export function generateMockTransactionSignature(): string {
   let signature = '';
-  // Generate 88 random characters from the base58 alphabet
   for (let i = 0; i < 88; i++) {
     const randomIndex = Math.floor(Math.random() * BASE58_ALPHABET.length);
     signature += BASE58_ALPHABET[randomIndex];
@@ -41,17 +38,14 @@ export function formatTransactionSignature(signature: string, truncate = false, 
 }
 
 /**
- * Checks if a string looks like a valid Solana transaction signature
  * @param signature The string to check
  * @returns True if the string resembles a Solana transaction signature
  */
 export function isValidTransactionSignature(signature: string): boolean {
-  // Solana transaction signatures are 88 characters long and use base58 encoding
   if (!signature || signature.length !== 88) {
     return false;
   }
   
-  // Check if all characters are in the base58 alphabet
   return [...signature].every(char => BASE58_ALPHABET.includes(char));
 }
 
