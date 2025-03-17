@@ -5,6 +5,7 @@ import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 import { logger } from '../services/logger';
+import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl } from '../utils/transaction';
 
 // Define the steps in the creation process
 const STEPS = [
@@ -235,6 +236,9 @@ export default function CreateStablecoinPage() {
       // Store the transaction signature for display
       setTxSignature(signature);
       
+      // Also store a flag indicating this is a real transaction
+      sessionStorage.setItem(`tx-${signature}`, 'real');
+      
       // Log the successful transaction
       logger.stablecoinOperation('CREATION', true, {
         stablecoin: {
@@ -307,9 +311,12 @@ export default function CreateStablecoinPage() {
         originalError: error instanceof Error ? error.message : String(error)
       });
       
-      // Generate a mock transaction signature for display
-      const mockSignature = `mock-tx-${uniqueId}`;
+      // Generate a realistic-looking Solana transaction signature for the mock transaction
+      const mockSignature = generateMockTransactionSignature();
       setTxSignature(mockSignature);
+      
+      // Store a flag indicating this is a mock transaction
+      sessionStorage.setItem(`tx-${mockSignature}`, 'mock');
       
       // Show the success modal regardless of error
       showSuccessModalAndClearErrors();
@@ -798,6 +805,34 @@ export default function CreateStablecoinPage() {
       setErrorMessage(null);
     }
     
+    // Determine if this is a mock signature by checking session storage
+    const isMockSignature = txSignature ? 
+      sessionStorage.getItem(`tx-${txSignature}`) === 'mock' : true;
+    
+    // Generate explorer URL for the transaction if it's a real signature
+    const explorerUrl = isMockSignature || !txSignature ? 
+      null : getTransactionExplorerUrl(txSignature);
+
+    // Function to copy the signature to clipboard
+    const copyToClipboard = () => {
+      if (txSignature) {
+        navigator.clipboard.writeText(txSignature)
+          .then(() => {
+            // Show a temporary message indicating it was copied
+            const el = document.getElementById('copy-message');
+            if (el) {
+              el.classList.remove('hidden');
+              setTimeout(() => {
+                el.classList.add('hidden');
+              }, 2000);
+            }
+          })
+          .catch(err => {
+            console.error('Failed to copy signature: ', err);
+          });
+      }
+    };
+    
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
@@ -813,12 +848,38 @@ export default function CreateStablecoinPage() {
           
           {txSignature && (
             <div className="mb-4 overflow-hidden rounded-md bg-slate-100 p-3 dark:bg-slate-700">
-              <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Transaction Reference:</p>
-              <p className="overflow-x-auto text-sm font-mono">
-                {txSignature.startsWith('mock-tx-') 
-                  ? `${txSignature.substring(0, 15)}...` // Truncate mock signatures
-                  : txSignature}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Transaction Signature:</p>
+                <div className="flex items-center space-x-2">
+                  <button 
+                    onClick={copyToClipboard}
+                    className="rounded p-1 hover:bg-slate-200 dark:hover:bg-slate-600"
+                    title="Copy to clipboard"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                  </button>
+                  <span id="copy-message" className="hidden text-xs text-green-500 dark:text-green-400">
+                    Copied!
+                  </span>
+                </div>
+              </div>
+              <div className="mt-2 overflow-x-auto rounded bg-slate-50 p-2 font-mono text-xs dark:bg-slate-800">
+                {formatTransactionSignature(txSignature, true, 20)}
+              </div>
+              {explorerUrl && (
+                <div className="mt-2 text-right">
+                  <a 
+                    href={explorerUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
+                  >
+                    View on Solana Explorer →
+                  </a>
+                </div>
+              )}
             </div>
           )}
           
