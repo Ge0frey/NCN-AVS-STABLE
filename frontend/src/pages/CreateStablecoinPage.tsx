@@ -5,7 +5,7 @@ import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 import { logger } from '../services/logger';
-import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl } from '../utils/transaction';
+import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl, isValidTransactionSignature } from '../utils/transaction';
 
 // Add animation styles to the document
 if (typeof document !== 'undefined') {
@@ -847,9 +847,15 @@ export default function CreateStablecoinPage() {
       setErrorMessage(null);
     }
     
-    // Determine if this is a mock signature by checking session storage
-    const isMockSignature = txSignature ? 
-      sessionStorage.getItem(`tx-${txSignature}`) === 'mock' : true;
+    // Determine if this is a mock signature
+    // First check if we have a flag in session storage
+    const isMockSignatureFromStorage = txSignature ? 
+      sessionStorage.getItem(`tx-${txSignature}`) === 'mock' : false;
+    
+    // If we don't have a flag, check if the signature is a valid Solana signature format
+    // This way we can handle both old and new signature formats
+    const isMockSignature = isMockSignatureFromStorage || 
+      (txSignature && !isValidTransactionSignature(txSignature));
     
     // Generate explorer URL for the transaction if it's a real signature
     const explorerUrl = isMockSignature || !txSignature ? 
@@ -1158,7 +1164,7 @@ export default function CreateStablecoinPage() {
               <>
                 <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Creating...
               </>

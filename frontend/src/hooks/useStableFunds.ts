@@ -52,6 +52,23 @@ const storeFallbackStablecoinsToStorage = (stablecoins: UserStablecoin[]): void 
   }
 };
 
+// Base58 alphabet used by Solana for transaction signatures
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+/**
+ * Generates a random Solana-like transaction signature
+ * @returns A random string that looks like a Solana transaction signature (88 chars)
+ */
+function generateSolanaLikeSignature(): string {
+  let signature = '';
+  // Generate 88 random characters from the base58 alphabet
+  for (let i = 0; i < 88; i++) {
+    const randomIndex = Math.floor(Math.random() * BASE58_ALPHABET.length);
+    signature += BASE58_ALPHABET[randomIndex];
+  }
+  return signature;
+}
+
 export function useStableFunds() {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -313,8 +330,11 @@ export function useStableFunds() {
           prev.map(coin => coin.id === fallbackId ? updatedStablecoin : coin)
         );
         
-        // Generate a mock transaction ID
-        const mockSignature = `mock-tx-deposit-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        // Generate a mock transaction signature using our utility function
+        const mockSignature = generateSolanaLikeSignature();
+        
+        // Store a flag in sessionStorage to identify this as a mock transaction
+        sessionStorage.setItem(`tx-${mockSignature}`, 'mock');
         
         // Return a simulated result
         return { signature: mockSignature };
@@ -379,8 +399,11 @@ export function useStableFunds() {
           prev.map(coin => coin.id === fallbackId ? updatedStablecoin : coin)
         );
         
-        // Generate a mock transaction ID
-        const mockSignature = `mock-tx-mint-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        // Generate a mock transaction signature using our utility function
+        const mockSignature = generateSolanaLikeSignature();
+        
+        // Store a flag in sessionStorage to identify this as a mock transaction
+        sessionStorage.setItem(`tx-${mockSignature}`, 'mock');
         
         // Return a simulated result
         return { signature: mockSignature };
