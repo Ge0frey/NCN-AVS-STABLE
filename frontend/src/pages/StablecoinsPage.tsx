@@ -236,7 +236,7 @@ export default function StablecoinsPage() {
                 </button>
                 {coin.isOwned ? (
                   <button
-                    onClick={() => navigate('/mint')}
+                    onClick={() => navigate('/mint', { state: { stablecoinId: coin.id } })}
                     className="btn btn-primary flex-1"
                   >
                     Mint
@@ -384,7 +384,7 @@ export default function StablecoinsPage() {
                       </button>
                       {coin.isOwned ? (
                         <button
-                          onClick={() => navigate('/mint')}
+                          onClick={() => navigate('/mint', { state: { stablecoinId: coin.id } })}
                           className="rounded-md p-2 text-sky-500 hover:bg-sky-100 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
