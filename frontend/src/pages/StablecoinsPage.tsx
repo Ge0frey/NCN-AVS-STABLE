@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useStableFunds } from '../hooks/useStableFunds';
 
 export default function StablecoinsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { userStablecoins, loading, error, fetchUserStablecoins } = useStableFunds();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterOwned, setFilterOwned] = useState(false);
@@ -13,8 +14,22 @@ export default function StablecoinsPage() {
 
   // Refresh stablecoins when component mounts
   useEffect(() => {
+    console.log('StablecoinsPage mounted, fetching stablecoins...');
     fetchUserStablecoins();
   }, [fetchUserStablecoins]);
+
+  // Refresh when coming back from create page
+  useEffect(() => {
+    const comingFromCreatePage = location.state?.fromCreate || sessionStorage.getItem('just_created_stablecoin') === 'true';
+    
+    // If navigating here after creation, force refresh
+    if (comingFromCreatePage) {
+      console.log('Coming from stablecoin creation, refreshing stablecoins...');
+      fetchUserStablecoins();
+      // Clear the session flag
+      sessionStorage.removeItem('just_created_stablecoin');
+    }
+  }, [location, fetchUserStablecoins]);
 
   // Filter and sort stablecoins
   const filteredStablecoins = userStablecoins

@@ -94,7 +94,8 @@ export default function CreateStablecoinPage() {
     stablebonds, 
     fetchStablebonds, 
     createStablecoin,
-    addFallbackStablecoin
+    addFallbackStablecoin,
+    fetchUserStablecoins
   } = useStableFunds();
   
   // Form state
@@ -287,6 +288,9 @@ export default function CreateStablecoinPage() {
         uniqueId
       });
       
+      // Immediately refresh the user's stablecoins list
+      fetchUserStablecoins();
+      
       // Show success modal
       showSuccessModalAndClearErrors();
     } catch (error) {
@@ -352,6 +356,9 @@ export default function CreateStablecoinPage() {
       
       // Store a flag indicating this is a mock transaction
       sessionStorage.setItem(`tx-${mockSignature}`, 'mock');
+      
+      // Immediately refresh the user's stablecoins list
+      fetchUserStablecoins();
       
       // Show the success modal regardless of error
       showSuccessModalAndClearErrors();
@@ -868,6 +875,10 @@ export default function CreateStablecoinPage() {
       }
     };
     
+    // Set a session flag to indicate we just created a stablecoin
+    // This helps the StablecoinsPage know to refresh
+    sessionStorage.setItem('just_created_stablecoin', 'true');
+    
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
         <div className="w-full max-w-lg rounded-xl bg-white/95 p-6 shadow-2xl dark:bg-slate-800/95 dark:shadow-blue-900/20 border border-slate-200/20 dark:border-slate-700/30 transform transition-all duration-300 animate-scaleIn">
@@ -980,7 +991,8 @@ export default function CreateStablecoinPage() {
             <button
               onClick={() => {
                 setShowSuccessModal(false);
-                navigate('/stablecoins');
+                // Pass state to indicate we're coming from the create page
+                navigate('/stablecoins', { state: { fromCreate: true } });
               }}
               className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white font-medium shadow-lg shadow-sky-500/20 hover:shadow-sky-600/30 transition-all duration-200 dark:from-sky-600 dark:to-sky-800 dark:shadow-sky-800/30"
             >

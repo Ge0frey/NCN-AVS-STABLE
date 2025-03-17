@@ -4,6 +4,9 @@ import { AnchorProvider } from '@coral-xyz/anchor';
 import { PublicKey } from '@solana/web3.js';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 
+// Key for storing fallback stablecoins in localStorage
+const FALLBACK_STABLECOINS_STORAGE_KEY = 'stable-funds-fallback-stablecoins';
+
 // Create an interface for the fallback stablecoin event data
 interface FallbackStablecoinEvent extends Event {
   detail: {
@@ -27,6 +30,28 @@ export interface UserStablecoin {
   createdAt: number;
 }
 
+// Helper to safely retrieve fallback stablecoins from localStorage
+const getFallbackStablecoinsFromStorage = (): UserStablecoin[] => {
+  try {
+    const storedData = localStorage.getItem(FALLBACK_STABLECOINS_STORAGE_KEY);
+    if (storedData) {
+      return JSON.parse(storedData);
+    }
+  } catch (error) {
+    console.error('Error retrieving fallback stablecoins from localStorage:', error);
+  }
+  return [];
+};
+
+// Helper to safely store fallback stablecoins to localStorage
+const storeFallbackStablecoinsToStorage = (stablecoins: UserStablecoin[]): void => {
+  try {
+    localStorage.setItem(FALLBACK_STABLECOINS_STORAGE_KEY, JSON.stringify(stablecoins));
+  } catch (error) {
+    console.error('Error storing fallback stablecoins to localStorage:', error);
+  }
+};
+
 export function useStableFunds() {
   const { connection } = useConnection();
   const wallet = useAnchorWallet();
@@ -35,8 +60,15 @@ export function useStableFunds() {
   const [error, setError] = useState<string | null>(null);
   const [stablebonds, setStablebonds] = useState<StablebondData[]>([]);
   const [userStablecoins, setUserStablecoins] = useState<UserStablecoin[]>([]);
-  // Track fallback stablecoins separately
-  const [fallbackStablecoins, setFallbackStablecoins] = useState<UserStablecoin[]>([]);
+  // Initialize fallback stablecoins from localStorage
+  const [fallbackStablecoins, setFallbackStablecoins] = useState<UserStablecoin[]>(() => {
+    return getFallbackStablecoinsFromStorage();
+  });
+
+  // Update localStorage whenever fallbackStablecoins changes
+  useEffect(() => {
+    storeFallbackStablecoinsToStorage(fallbackStablecoins);
+  }, [fallbackStablecoins]);
 
   // Initialize the client when wallet is connected
   useEffect(() => {
@@ -97,7 +129,10 @@ export function useStableFunds() {
         if (exists) {
           return prev;
         }
-        return [...prev, stablecoin];
+        const updatedStablecoins = [...prev, stablecoin];
+        // Also update localStorage immediately to ensure persistence
+        storeFallbackStablecoinsToStorage(updatedStablecoins);
+        return updatedStablecoins;
       });
     };
     
@@ -112,7 +147,17 @@ export function useStableFunds() {
 
   // Fetch user's stablecoins
   const fetchUserStablecoins = useCallback(async () => {
-    if (!client) return;
+    // Always load from localStorage first to ensure we have the latest fallbacks
+    const storedFallbacks = getFallbackStablecoinsFromStorage();
+    if (storedFallbacks.length > 0 && JSON.stringify(storedFallbacks) !== JSON.stringify(fallbackStablecoins)) {
+      setFallbackStablecoins(storedFallbacks);
+    }
+
+    if (!client) {
+      // Even if there's no client, we should still display any fallback stablecoins
+      setUserStablecoins([...storedFallbacks]);
+      return;
+    }
     
     try {
       setLoading(true);
@@ -126,7 +171,7 @@ export function useStableFunds() {
       const combinedStablecoins = [...stablecoins];
       
       // Add fallback stablecoins that don't exist in the blockchain list
-      fallbackStablecoins.forEach(fallbackCoin => {
+      storedFallbacks.forEach(fallbackCoin => {
         const existsInBlockchain = stablecoins.some(
           coin => coin.name === fallbackCoin.name && coin.symbol === fallbackCoin.symbol
         );
@@ -142,7 +187,7 @@ export function useStableFunds() {
       setError('Failed to fetch stablecoins. Please try again.');
       
       // Even if there's an error, still display any fallback stablecoins
-      setUserStablecoins([...fallbackStablecoins]);
+      setUserStablecoins([...storedFallbacks]);
     } finally {
       setLoading(false);
     }
@@ -215,13 +260,17 @@ export function useStableFunds() {
 
   // Add a function to manually add a fallback stablecoin (for direct integration)
   const addFallbackStablecoin = useCallback((stablecoin: UserStablecoin) => {
+    console.log('Adding fallback stablecoin manually:', stablecoin);
     setFallbackStablecoins(prev => {
       // Check if this stablecoin already exists to avoid duplicates
       const exists = prev.some(coin => coin.id === stablecoin.id);
       if (exists) {
         return prev;
       }
-      return [...prev, stablecoin];
+      const updatedStablecoins = [...prev, stablecoin];
+      // Also update localStorage immediately
+      storeFallbackStablecoinsToStorage(updatedStablecoins);
+      return updatedStablecoins;
     });
   }, []);
 
