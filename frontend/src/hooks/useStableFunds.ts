@@ -99,16 +99,27 @@ export function useStableFunds() {
   }, [client, fetchUserStablecoins]);
 
   // Fetch available stablebonds
-  const fetchStablebonds = useCallback(async () => {
+  const fetchStablebonds = useCallback(async (maxRetries = 3) => {
     if (!client) return;
     
     try {
       setLoading(true);
       setError(null);
       
-      // Fetch bonds using the client implementation
-      const bonds = await client.fetchStablebonds();
-      setStablebonds(bonds);
+      // Show a more informative message during the fetching process
+      setStablebonds([]);
+      
+      // Fetch bonds using the client implementation with retry mechanism
+      const bonds = await client.fetchStablebonds(maxRetries);
+      
+      if (bonds.length > 0) {
+        console.log(`Successfully fetched ${bonds.length} stablebonds`);
+        setStablebonds(bonds);
+        setError(null);
+      } else {
+        console.warn('No stablebonds were returned');
+        setError('No stablebonds are currently available. Please try again later.');
+      }
     } catch (err) {
       console.error('Error fetching stablebonds:', err);
       setError('Failed to fetch stablebonds. Please try again.');
