@@ -149,10 +149,43 @@ export default function CreateStablecoinPage() {
       return;
     }
     
+    // Validate that a collateral type is selected
+    if (!formData.collateralType) {
+      setErrorMessage('Please select a collateral type');
+      return;
+    }
+    
+    // Validate name and symbol
+    if (!formData.name.trim()) {
+      setErrorMessage('Please enter a name for your stablecoin');
+      return;
+    }
+    
+    if (!formData.symbol.trim()) {
+      setErrorMessage('Please enter a symbol for your stablecoin');
+      return;
+    }
+    
     setIsSubmitting(true);
     setErrorMessage(null);
     
     try {
+      console.log("Submitting stablecoin creation with data:", formData);
+      
+      // Ensure the stablebond mint is a valid PublicKey if selected
+      let stablebondMint: PublicKey | undefined = undefined;
+      if (formData.collateralType === 'stablebond' && formData.selectedStablebond) {
+        try {
+          stablebondMint = new PublicKey(formData.selectedStablebond.bondMint.toString());
+          console.log("Using stablebond mint:", stablebondMint.toString());
+        } catch (error) {
+          console.error("Invalid stablebond mint:", error);
+          setErrorMessage('Invalid stablebond selected. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      
       // Prepare the parameters for creating a stablecoin
       const params = {
         name: formData.name,
@@ -161,10 +194,12 @@ export default function CreateStablecoinPage() {
         iconIndex: parseInt(formData.icon.codePointAt(0)?.toString() || '0') % 10, // Convert emoji to number
         collateralType: formData.collateralType === 'stablebond' ? 'Stablebond' : 
                         formData.collateralType === 'jitosol' ? 'SOL' : 'USDC',
-        stablebondMint: formData.selectedStablebond?.bondMint,
+        stablebondMint: stablebondMint,
         collateralizationRatio: formData.collateralizationRatio,
         initialSupply: formData.initialSupply,
       } as StablecoinParams;
+      
+      console.log("Calling createStablecoin with params:", params);
       
       // Call the createStablecoin function from our hook
       const { signature } = await createStablecoin(params);
@@ -186,7 +221,26 @@ export default function CreateStablecoinPage() {
         const match = errorMessage.match(/Message: (.*?)(?=\. Logs:|\n|$)/);
         if (match && match[1]) {
           displayError = match[1].trim();
+        } else {
+          // Try to extract the error from the logs
+          const logsMatch = errorMessage.match(/Logs: \[(.*?)\]/);
+          if (logsMatch && logsMatch[1]) {
+            displayError = `Transaction simulation failed: ${logsMatch[1].trim()}`;
+          }
         }
+      }
+      
+      // Check for common errors and provide more helpful messages
+      if (displayError.includes('insufficient funds')) {
+        displayError = 'Insufficient funds in your wallet. Please add more SOL to cover the transaction.';
+      } else if (displayError.includes('already in use')) {
+        displayError = 'A stablecoin with this name and symbol already exists. Please choose a different name or symbol.';
+      } else if (displayError.includes('invalid collateral type')) {
+        displayError = 'The selected collateral type is invalid. Please choose a different collateral type.';
+      } else if (displayError.includes('incorrect program id')) {
+        displayError = 'Token program configuration error. Please try again or contact support.';
+      } else if (displayError.includes('Failed to fetch') || displayError.includes('network')) {
+        displayError = 'Network connection error. Please check your internet connection and try again.';
       }
       
       setErrorMessage(`Failed to create stablecoin: ${displayError}`);
@@ -637,21 +691,29 @@ export default function CreateStablecoinPage() {
     console.log('Selected stablebond:', stablebond);
     console.log('Mint address:', stablebond.bondMint.toString());
     
-    // Explicitly create a clone of the bond object to prevent reference issues
-    const selectedBond = {
-      bondMint: stablebond.bondMint,
-      name: stablebond.name,
-      symbol: stablebond.symbol,
-      price: stablebond.price,
-      maturityTime: stablebond.maturityTime,
-      issuanceDate: stablebond.issuanceDate,
-      annualYield: stablebond.annualYield
-    };
-    
-    setFormData(prev => ({
-      ...prev,
-      selectedStablebond: selectedBond
-    }));
+    try {
+      // Explicitly create a clone of the bond object to prevent reference issues
+      const selectedBond = {
+        bondMint: new PublicKey(stablebond.bondMint.toString()), // Create a new PublicKey instance
+        name: stablebond.name,
+        symbol: stablebond.symbol,
+        price: stablebond.price,
+        maturityTime: stablebond.maturityTime,
+        issuanceDate: stablebond.issuanceDate,
+        annualYield: stablebond.annualYield
+      };
+      
+      console.log('Cloned selected bond:', selectedBond);
+      console.log('Cloned mint address:', selectedBond.bondMint.toString());
+      
+      setFormData(prev => ({
+        ...prev,
+        selectedStablebond: selectedBond
+      }));
+    } catch (error) {
+      console.error('Error selecting stablebond:', error);
+      setErrorMessage('Error selecting stablebond. Please try again.');
+    }
   };
 
   // Success Modal

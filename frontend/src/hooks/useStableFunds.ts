@@ -42,6 +42,22 @@ export function useStableFunds() {
         const stableFundsClient = new StableFundsClient(provider);
         setClient(stableFundsClient);
         setError(null);
+        
+        // Check bridge server connection
+        fetch('http://localhost:3002/health')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Bridge server is not responding properly');
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log('Bridge server health check:', data);
+          })
+          .catch(err => {
+            console.warn('Bridge server health check failed:', err);
+            // Don't set error here, as the bridge server is optional
+          });
       } catch (err) {
         console.error('Error initializing StableFundsClient:', err);
         setError('Failed to connect to the Solana blockchain. Please refresh and try again.');
