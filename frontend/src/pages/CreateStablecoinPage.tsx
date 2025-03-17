@@ -77,7 +77,8 @@ export default function CreateStablecoinPage() {
       setErrorMessage(null); // Clear any previous errors
       setFormData(prev => ({ ...prev, selectedStablebond: null })); // Reset selected stablebond
       
-      fetchStablebonds().catch(err => {
+      // Fetch stablebonds with retry mechanism
+      fetchStablebonds(3).catch(err => {
         console.error("Failed to fetch stablebonds:", err);
         setErrorMessage("Failed to fetch available stablebonds. Please try again later or select a different collateral type.");
       });
@@ -434,9 +435,10 @@ export default function CreateStablecoinPage() {
             </h3>
             
             {loading ? (
-              <div className="flex justify-center py-6">
-                <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-sky-400"></div>
-                <span className="ml-2 text-sm text-slate-300">Loading available stablebonds...</span>
+              <div className="flex flex-col items-center justify-center py-6">
+                <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-400"></div>
+                <span className="mt-3 text-sm text-slate-300">Loading available stablebonds...</span>
+                <p className="mt-2 text-xs text-slate-400">This may take a moment. We're trying to connect to the Etherfuse SDK.</p>
               </div>
             ) : hookError ? (
               <div className="rounded-md bg-red-900/20 p-3 text-red-400 text-sm">
@@ -450,7 +452,7 @@ export default function CreateStablecoinPage() {
                     <p>{hookError}</p>
                     <div className="mt-2 flex space-x-3">
                       <button
-                        onClick={() => fetchStablebonds()}
+                        onClick={() => fetchStablebonds(3)}
                         className="rounded bg-red-900/30 px-2 py-1 text-xs font-semibold text-red-300 hover:bg-red-900/50"
                       >
                         Try Again
@@ -488,6 +490,9 @@ export default function CreateStablecoinPage() {
               </div>
             ) : (
               <div className="space-y-2.5">
+                <p className="text-xs text-slate-400 mb-3">
+                  {stablebonds.length} stablebonds available. Select one to use as collateral.
+                </p>
                 {stablebonds.map((bond) => (
                   <div
                     key={bond.bondMint.toString()}
