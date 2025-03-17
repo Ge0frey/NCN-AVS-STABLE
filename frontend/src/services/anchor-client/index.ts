@@ -301,120 +301,257 @@ export class StableFundsClient {
   }
   
   /**
-   * Fetch available stablebonds using Etherfuse SDK
+   * Fetch available stablebonds using Etherfuse SDK with retry mechanism
    */
-  async fetchStablebonds(): Promise<StablebondData[]> {
-    try {
-      console.log('Fetching stablebonds via Etherfuse SDK...');
-      
-      // Use the Etherfuse SDK to fetch the bonds
-      const rpcEndpoint = this.provider.connection.rpcEndpoint;
-      
-      // Fetch bonds from the Etherfuse SDK
-      const bonds = await StablebondProgram.getBonds(rpcEndpoint);
-      
-      if (!bonds || bonds.length === 0) {
-        console.warn('No stablebonds found from the SDK');
-        
-        // Return a mock bond for testing if no bonds are found
-        // This helps users test the functionality even if the SDK doesn't return real bonds
-        return [{
-          bondMint: new PublicKey('BjqPas8bgNt4bYfFNzJfLnv77A5ReW2PBhymzeeqCMzL'),
-          name: 'Jordanian Gold 2',
-          symbol: 'JOGo2',
-          price: 1.05,
-          maturityTime: Date.now() + 365 * 24 * 60 * 60 * 1000,
-          issuanceDate: Date.now() - 30 * 24 * 60 * 60 * 1000,
-          annualYield: 5.2,
-        }];
-      }
-      
-      console.log('Raw bonds from SDK:', bonds);
-      
-      // Map the bonds to our format, accessing the nested structure correctly
-      const stablebonds = bonds.map((bond, index) => {
-        // Get mint address - it may be nested under the mint property
-        let mintString;
-        if (typeof bond.mint === 'object' && bond.mint?.address) {
-          // New SDK format with nested structure
-          mintString = bond.mint.address;
-        } else if (typeof bond.mint === 'object') {
-          // Handle case when mint is an object but doesn't have address
-          mintString = bond.mint?.toString();
-        } else {
-          // Fallback to direct value if it's a string
-          mintString = bond.mint;
-        }
-        
-        console.log(`Bond ${index} mint:`, mintString);
-        
-        // Create PublicKey from mint string
-        let bondMint: PublicKey;
-        try {
-          bondMint = new PublicKey(mintString);
-        } catch (e) {
-          console.error(`Error creating PublicKey from bond mint for bond ${index}:`, e);
-          // Use a default valid public key for testing
-          bondMint = new PublicKey('BjqPas8bgNt4bYfFNzJfLnv77A5ReW2PBhymzeeqCMzL');
-        }
+  async fetchStablebonds(maxRetries = 3, retryDelay = 1000): Promise<StablebondData[]> {
+    let retryCount = 0;
+    let lastError: any = null;
 
-        // Get name and symbol from the nested structure if available
-        // Based on the reference code, they might be under bond.mint
-        const name = bond.mint?.name || bond.name || `Bond ${index + 1}`;
-        const symbol = bond.mint?.symbol || bond.symbol || `BOND${index + 1}`;
+    while (retryCount < maxRetries) {
+      try {
+        console.log(`Fetching stablebonds via Etherfuse SDK... (Attempt ${retryCount + 1}/${maxRetries})`);
         
-        // Extract price and other values, checking both possible locations
-        const price = (bond.mint?.price || bond.price || 0) / 1_000_000; // Convert to UI amount
+        // Use the Etherfuse SDK to fetch the bonds
+        const rpcEndpoint = this.provider.connection.rpcEndpoint;
         
-        // Log each bond mapping for debugging
-        console.log(`Mapping bond ${index}:`, {
-          original: bond,
-          extracted: {
-            mintString,
-            name,
-            symbol,
-            price
-          },
-          mappedTo: {
-            bondMint: bondMint.toString(),
-            name,
-            symbol,
-            price
+        // Fetch bonds from the Etherfuse SDK
+        const bonds = await StablebondProgram.getBonds(rpcEndpoint);
+        
+        if (!bonds || bonds.length === 0) {
+          console.warn(`No stablebonds found from the SDK (Attempt ${retryCount + 1}/${maxRetries})`);
+          retryCount++;
+          
+          if (retryCount < maxRetries) {
+            console.log(`Retrying in ${retryDelay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            continue;
+          } else {
+            console.warn('All retry attempts failed. Using mock stablebond data.');
+            return this.createMockStablebonds();
           }
+        }
+        
+        console.log('Raw bonds from SDK:', bonds);
+        
+        // Map the bonds to our format, accessing the nested structure correctly
+        const stablebonds = bonds.map((bond, index) => {
+          // Get mint address - it may be nested under the mint property
+          let mintString;
+          if (typeof bond.mint === 'object' && bond.mint?.address) {
+            // New SDK format with nested structure
+            mintString = bond.mint.address;
+          } else if (typeof bond.mint === 'object') {
+            // Handle case when mint is an object but doesn't have address
+            mintString = bond.mint?.toString();
+          } else {
+            // Fallback to direct value if it's a string
+            mintString = bond.mint;
+          }
+          
+          console.log(`Bond ${index} mint:`, mintString);
+          
+          // Create PublicKey from mint string
+          let bondMint: PublicKey;
+          try {
+            bondMint = new PublicKey(mintString);
+          } catch (e) {
+            console.error(`Error creating PublicKey from bond mint for bond ${index}:`, e);
+            // Use a default valid public key for testing
+            bondMint = new PublicKey('BjqPas8bgNt4bYfFNzJfLnv77A5ReW2PBhymzeeqCMzL');
+          }
+
+          // Get name and symbol from the nested structure if available
+          // Based on the reference code, they might be under bond.mint
+          const name = bond.mint?.name || bond.name || `Bond ${index + 1}`;
+          const symbol = bond.mint?.symbol || bond.symbol || `BOND${index + 1}`;
+          
+          // Extract price and other values, checking both possible locations
+          const price = (bond.mint?.price || bond.price || 0) / 1_000_000; // Convert to UI amount
+          
+          // Log each bond mapping for debugging
+          console.log(`Mapping bond ${index}:`, {
+            original: bond,
+            extracted: {
+              mintString,
+              name,
+              symbol,
+              price
+            },
+            mappedTo: {
+              bondMint: bondMint.toString(),
+              name,
+              symbol,
+              price
+            }
+          });
+          
+          return {
+            bondMint,
+            name,
+            symbol,
+            price: price || 1.0, // Default to 1.0 if price is not available
+            maturityTime: bond.maturityTime ? bond.maturityTime.toNumber() : Date.now() + 365 * 24 * 60 * 60 * 1000,
+            issuanceDate: bond.issuanceDate ? bond.issuanceDate.toNumber() : Date.now(),
+            annualYield: (bond.annualYield || 0) / 100, // Convert basis points to percentage
+          };
         });
         
-        return {
-          bondMint,
-          name,
-          symbol,
-          price: price || 1.0, // Default to 1.0 if price is not available
-          maturityTime: bond.maturityTime ? bond.maturityTime.toNumber() : Date.now() + 365 * 24 * 60 * 60 * 1000,
-          issuanceDate: bond.issuanceDate ? bond.issuanceDate.toNumber() : Date.now(),
-          annualYield: (bond.annualYield || 0) / 100, // Convert basis points to percentage
-        };
-      });
-      
-      console.log('Processed stablebonds:', stablebonds);
-      
-      // If we somehow ended up with no valid bonds, return a mock bond
-      if (stablebonds.length === 0) {
-        return [{
-          bondMint: new PublicKey('BjqPas8bgNt4bYfFNzJfLnv77A5ReW2PBhymzeeqCMzL'),
-          name: 'Jordanian Gold 2',
-          symbol: 'JOGo2',
-          price: 1.05,
-          maturityTime: Date.now() + 365 * 24 * 60 * 60 * 1000,
-          issuanceDate: Date.now() - 30 * 24 * 60 * 60 * 1000,
-          annualYield: 5.2,
-        }];
+        console.log('Processed stablebonds:', stablebonds);
+        
+        // If we somehow ended up with no valid bonds, use mock data
+        if (stablebonds.length === 0) {
+          console.warn('No valid stablebonds after processing. Using mock data.');
+          return this.createMockStablebonds();
+        }
+        
+        return stablebonds;
+      } catch (error) {
+        lastError = error;
+        console.error(`Error fetching stablebonds from SDK (Attempt ${retryCount + 1}/${maxRetries}):`, error);
+        retryCount++;
+        
+        if (retryCount < maxRetries) {
+          // Exponential backoff: increase delay with each retry
+          const currentDelay = retryDelay * Math.pow(2, retryCount - 1);
+          console.log(`Retrying in ${currentDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, currentDelay));
+        } else {
+          console.warn('All retry attempts failed. Using mock stablebond data.');
+          return this.createMockStablebonds();
+        }
       }
-      
-      return stablebonds;
+    }
+    
+    // If we've exhausted all retries, use mock data
+    console.warn('All retry attempts failed. Using mock stablebond data.');
+    return this.createMockStablebonds();
+  }
+  
+  /**
+   * Create mock stablebonds from the provided data
+   */
+  private createMockStablebonds(): StablebondData[] {
+    console.log('Creating mock stablebonds from provided data');
+    
+    try {
+      // Parse the raw bond data to create properly formatted mock stablebonds
+      // This is a more robust implementation that handles the nested structure
+      return [
+        // GILTS bond
+        {
+          bondMint: new PublicKey('A433vq62iQbDToDeZ3XZcWj1VWFHYB95SYwnZgSoEmXy'),
+          name: 'Etherfuse GILTS',
+          symbol: 'GILTS',
+          price: 1.02,
+          maturityTime: Date.now() + 180 * 24 * 60 * 60 * 1000, // 180 days from now
+          issuanceDate: Date.now() - 30 * 24 * 60 * 60 * 1000, // 30 days ago
+          annualYield: 4.5,
+        },
+        // USTRY bond
+        {
+          bondMint: new PublicKey('7F6o7SWyUrBEXQZaZkRcEXPkvSG4zvuGRq3XBtmwSMCu'),
+          name: 'Etherfuse USTRY Test',
+          symbol: 'USTRYb',
+          price: 1.03,
+          maturityTime: Date.now() + 365 * 24 * 60 * 60 * 1000, // 1 year from now
+          issuanceDate: Date.now() - 60 * 24 * 60 * 60 * 1000, // 60 days ago
+          annualYield: 5.2,
+        },
+        // CETES_SQUARED bond
+        {
+          bondMint: new PublicKey('3UCMAjoMbQG4KcWj3daYajyWnngh3SNwktQAccAo7Dbw'),
+          name: 'CETES_SQUARED',
+          symbol: 'Cetes2',
+          price: 1.01,
+          maturityTime: Date.now() + 90 * 24 * 60 * 60 * 1000, // 90 days from now
+          issuanceDate: Date.now() - 15 * 24 * 60 * 60 * 1000, // 15 days ago
+          annualYield: 3.8,
+        },
+        // USD Test bond
+        {
+          bondMint: new PublicKey('7cpabuYMyG5LGCTgs3FnB5jw96J7Rxj86ABNEH3WrjZ8'),
+          name: 'USD Test',
+          symbol: 'USDx',
+          price: 1.00,
+          maturityTime: Date.now() + 120 * 24 * 60 * 60 * 1000, // 120 days from now
+          issuanceDate: Date.now() - 45 * 24 * 60 * 60 * 1000, // 45 days ago
+          annualYield: 3.5,
+        },
+        // Cetes-2 bond
+        {
+          bondMint: new PublicKey('GzahfNHbbYHzH7SxGALtb5Czv9wGNdBNbAJ73MrWaGiB'),
+          name: 'Cetes-2',
+          symbol: 'Cetes2',
+          price: 1.02,
+          maturityTime: Date.now() + 60 * 24 * 60 * 60 * 1000, // 60 days from now
+          issuanceDate: Date.now() - 20 * 24 * 60 * 60 * 1000, // 20 days ago
+          annualYield: 4.0,
+        },
+        // Europe bond
+        {
+          bondMint: new PublicKey('DLsVVbb2ziZfg2bq3jojtg24jLEk1FzrVAWBcSJeKTr5'),
+          name: 'Europe',
+          symbol: 'EURO',
+          price: 1.05,
+          maturityTime: Date.now() + 240 * 24 * 60 * 60 * 1000, // 240 days from now
+          issuanceDate: Date.now() - 10 * 24 * 60 * 60 * 1000, // 10 days ago
+          annualYield: 4.8,
+        },
+        // USD Test bond (HELLjeg...)
+        {
+          bondMint: new PublicKey('HELLjegdkkJeLeBhMKxCvbUVXJnLEiJyFKLJtjpX4c55'),
+          name: 'USD Test',
+          symbol: 'USDx',
+          price: 1.01,
+          maturityTime: Date.now() + 150 * 24 * 60 * 60 * 1000, // 150 days from now
+          issuanceDate: Date.now() - 25 * 24 * 60 * 60 * 1000, // 25 days ago
+          annualYield: 3.7,
+        },
+        // Cetes-3 bond
+        {
+          bondMint: new PublicKey('5YrNQDeWxhYwFMHv3NYn8LwkwKEFHc9DRawWf4b2bZfy'),
+          name: 'Cetes-3',
+          symbol: 'Cetes2',
+          price: 1.02,
+          maturityTime: Date.now() + 75 * 24 * 60 * 60 * 1000, // 75 days from now
+          issuanceDate: Date.now() - 35 * 24 * 60 * 60 * 1000, // 35 days ago
+          annualYield: 4.2,
+        },
+        // Etherfuse TESOURO bond
+        {
+          bondMint: new PublicKey('EyvBnTz9QDVc2oaBVeu77kndynmD5njrWjZghYh5xpUk'),
+          name: 'Etherfuse TESOURO',
+          symbol: 'TESOURO',
+          price: 1.03,
+          maturityTime: Date.now() + 200 * 24 * 60 * 60 * 1000, // 200 days from now
+          issuanceDate: Date.now() - 40 * 24 * 60 * 60 * 1000, // 40 days ago
+          annualYield: 4.6,
+        },
+        // Cetes bond
+        {
+          bondMint: new PublicKey('AvvetPGuuB5FD5m86fpw3LtDKyQoUFT1mG9WarNQLW4q'),
+          name: 'Cetes',
+          symbol: 'CETES',
+          price: 1.01,
+          maturityTime: Date.now() + 100 * 24 * 60 * 60 * 1000, // 100 days from now
+          issuanceDate: Date.now() - 50 * 24 * 60 * 60 * 1000, // 50 days ago
+          annualYield: 3.9,
+        },
+        // Carnival bond
+        {
+          bondMint: new PublicKey('Eiy5cStL5z243zdxhSzjQbSdSoWuBtaJtz7Ced4MKWg1'),
+          name: 'Carnival',
+          symbol: 'CRNVL',
+          price: 1.04,
+          maturityTime: Date.now() + 220 * 24 * 60 * 60 * 1000, // 220 days from now
+          issuanceDate: Date.now() - 55 * 24 * 60 * 60 * 1000, // 55 days ago
+          annualYield: 5.0,
+        }
+      ];
     } catch (error) {
-      console.error('Error fetching stablebonds from SDK:', error);
+      console.error('Error creating mock stablebonds:', error);
       
-      // Return a mock bond for testing if there's an error
-      // This helps users test the functionality even if the SDK has issues
+      // Return a minimal set of mock bonds if there's an error
       return [{
         bondMint: new PublicKey('BjqPas8bgNt4bYfFNzJfLnv77A5ReW2PBhymzeeqCMzL'),
         name: 'Jordanian Gold 2',
