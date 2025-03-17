@@ -7,6 +7,41 @@ import StableFundsClient, { StablecoinParams, StablebondData } from '../services
 import { logger } from '../services/logger';
 import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl } from '../utils/transaction';
 
+// Add animation styles to the document
+if (typeof document !== 'undefined') {
+  // Only run in browser environment
+  const style = document.createElement('style');
+  style.innerHTML = `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes scaleIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    
+    .animate-fadeIn {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+    
+    .animate-scaleIn {
+      animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    
+    .animate-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.8; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 // Define the steps in the creation process
 const STEPS = [
   'Basic Information',
@@ -834,80 +869,126 @@ export default function CreateStablecoinPage() {
     };
     
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+        <div className="w-full max-w-lg rounded-xl bg-white/95 p-6 shadow-2xl dark:bg-slate-800/95 dark:shadow-blue-900/20 border border-slate-200/20 dark:border-slate-700/30 transform transition-all duration-300 animate-scaleIn">
+          {/* Success Icon */}
+          <div className="flex justify-center mb-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 ring-8 ring-green-50 dark:ring-green-900/10 animate-pulse">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
-          <h3 className="mb-2 text-xl font-bold">Stablecoin Created!</h3>
-          <p className="mb-4 text-slate-600 dark:text-slate-300">
-            Your stablecoin {formData.name} ({formData.symbol}) has been successfully created and is now available in your wallet.
-          </p>
           
+          {/* Title and Description */}
+          <div className="text-center mb-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-sky-600 bg-clip-text text-transparent dark:from-green-400 dark:to-sky-400">Stablecoin Created!</h3>
+            <p className="mt-2 text-slate-600 dark:text-slate-300">
+              Your stablecoin <span className="font-semibold">{formData.name}</span> (<span className="font-mono">{formData.symbol}</span>) has been successfully created and is now available in your wallet.
+            </p>
+          </div>
+          
+          {/* Transaction Signature Card */}
           {txSignature && (
-            <div className="mb-4 overflow-hidden rounded-md bg-slate-100 p-3 dark:bg-slate-700">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Transaction Signature:</p>
-                <div className="flex items-center space-x-2">
-                  <button 
-                    onClick={copyToClipboard}
-                    className="rounded p-1 hover:bg-slate-200 dark:hover:bg-slate-600"
-                    title="Copy to clipboard"
-                  >
+            <div className="mb-6 rounded-lg overflow-hidden bg-slate-50 shadow-inner dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50">
+              <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 border-b border-slate-200 dark:border-slate-700/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
-                  </button>
-                  <span id="copy-message" className="hidden text-xs text-green-500 dark:text-green-400">
-                    Copied!
-                  </span>
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Transaction Signature</p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={copyToClipboard}
+                      className="rounded p-1.5 bg-slate-200 hover:bg-slate-300 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600"
+                      title="Copy to clipboard"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                    </button>
+                    <span id="copy-message" className="hidden text-xs font-medium bg-green-100 text-green-800 py-0.5 px-2 rounded-full transition-all duration-300 dark:bg-green-800/30 dark:text-green-400">
+                      Copied!
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div className="mt-2 overflow-x-auto rounded bg-slate-50 p-2 font-mono text-xs dark:bg-slate-800">
-                {formatTransactionSignature(txSignature, true, 20)}
-              </div>
-              {explorerUrl && (
-                <div className="mt-2 text-right">
-                  <a 
-                    href={explorerUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300"
-                  >
-                    View on Solana Explorer →
-                  </a>
+              <div className="p-4">
+                <div className="overflow-x-auto rounded bg-slate-100 p-3 font-mono text-xs dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 leading-relaxed tracking-wider break-all">
+                  {formatTransactionSignature(txSignature, true, 20)}
                 </div>
-              )}
+                {explorerUrl && (
+                  <div className="mt-3 text-right">
+                    <a 
+                      href={explorerUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-xs text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 transition-colors"
+                    >
+                      <span>View on Solana Explorer</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </a>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
-          <div className="mb-4 overflow-hidden rounded-md bg-slate-100 p-3 dark:bg-slate-700">
-            <p className="mb-1 text-xs text-slate-500 dark:text-slate-400">Details:</p>
-            <ul className="text-sm space-y-1">
-              <li><span className="font-medium">Initial Supply:</span> {formData.initialSupply} {formData.symbol}</li>
-              <li><span className="font-medium">Collateral Type:</span> {
-                formData.collateralType === 'stablebond' ? 'Stablebond' : 
-                formData.collateralType === 'jitosol' ? 'JitoSOL' : 'USDC'
-              }</li>
-              <li><span className="font-medium">Collateralization Ratio:</span> {formData.collateralizationRatio}%</li>
-            </ul>
+          {/* Stablecoin Details Card */}
+          <div className="mb-6 rounded-lg bg-slate-50 dark:bg-slate-900/50 overflow-hidden border border-slate-200 dark:border-slate-700/50 shadow-inner">
+            <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 border-b border-slate-200 dark:border-slate-700/50">
+              <div className="flex items-center space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Stablecoin Details</p>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Initial Supply</p>
+                  <p className="text-sm font-semibold">{formData.initialSupply.toLocaleString()} <span className="font-mono">{formData.symbol}</span></p>
+                </div>
+                <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Collateral Type</p>
+                  <p className="text-sm font-semibold">{
+                    formData.collateralType === 'stablebond' ? 'Stablebond' : 
+                    formData.collateralType === 'jitosol' ? 'JitoSOL' : 'USDC'
+                  }</p>
+                </div>
+                <div className="col-span-2 bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Collateralization Ratio</p>
+                  <div className="flex items-center">
+                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5 mr-2">
+                      <div className="bg-gradient-to-r from-sky-400 to-sky-600 h-2.5 rounded-full dark:from-sky-600 dark:to-sky-400" 
+                          style={{ width: `${Math.min(100, formData.collateralizationRatio / 3)}%` }}></div>
+                    </div>
+                    <span className="text-sm font-semibold">{formData.collateralizationRatio}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           
+          {/* Action Buttons */}
           <div className="flex justify-end space-x-3">
             <button
               onClick={() => {
                 setShowSuccessModal(false);
                 navigate('/stablecoins');
               }}
-              className="rounded-md bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600"
+              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-600 hover:to-sky-700 text-white font-medium shadow-lg shadow-sky-500/20 hover:shadow-sky-600/30 transition-all duration-200 dark:from-sky-600 dark:to-sky-800 dark:shadow-sky-800/30"
             >
               View My Stablecoins
             </button>
             <button
               onClick={() => setShowSuccessModal(false)}
-              className="rounded-md border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-slate-100 hover:border-slate-400 transition-all duration-200 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:border-slate-500"
             >
               Close
             </button>
