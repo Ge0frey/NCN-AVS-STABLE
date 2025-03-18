@@ -1,3 +1,6 @@
+# DEMO VIDEO: https://drive.google.com/file/d/1GsyG-b0tkih1keR34pNJdJdpoIPkC0uk/view?usp=sharing
+## Access platform from - https://stablefunds-ncns.vercel.app/
+
 # STABLE-FUNDS Platform
 
 STABLE-FUNDS is a decentralized finance (DeFi) platform built on Sonic that enables users to create, manage, and interact with overcollateralized stablecoins. The platform leverages Sonic's high throughput and low fees to provide a seamless user experience for stablecoin operations, collateral management, and governance.
