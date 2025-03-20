@@ -3,8 +3,7 @@ import { RestakingVault, RestakingPosition } from '../types';
 import config from '../config/env';
 import { withFeatureFlag } from '../utils';
 
-// Import Jito Restaking SDK
-import * as jitoRestaking from '@jito-foundation/restaking-sdk';
+
 
 // Define interfaces for SDK types
 interface JitoVault {

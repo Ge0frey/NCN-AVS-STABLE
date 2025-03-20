@@ -32,7 +32,7 @@ class CambrianService {
           try {
             // Use Cambrian CLI to fetch oracle data
             const { stdout } = await execAsync(`camb oracle get-price -a ${assetId} -u ${this.avsId}`);
-            const data = JSON.parse(stdout);
+            const data = JSON.parse(stdout.trim()); // Add trim() to handle whitespace
             
             if (!data || !data.price) {
               throw new Error('Invalid oracle data from Cambrian CLI');
@@ -50,6 +50,12 @@ class CambrianService {
             
             // Try HTTP API as fallback
             const response = await fetch(`${this.avsUrl}/api/oracle/${assetId}`);
+            
+            // Check response status before parsing
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
             
             if (!data || !data.price) {
@@ -95,25 +101,30 @@ class CambrianService {
           // Try to get real operator data from Cambrian AVS
           try {
             // Use Cambrian CLI to fetch operators
-            const { stdout } = await execAsync(`camb operator list -u ${this.avsId} --json`);
-            const data = JSON.parse(stdout);
+            const { stdout } = await execAsync(`camb operator list -a ${this.avsId}`);
             
-            if (!Array.isArray(data)) {
-              throw new Error('Invalid operators data from Cambrian CLI');
-            }
+            // Split output into lines and parse each operator public key
+            const operatorKeys = stdout.trim().split('\n');
             
-            return data.map(op => ({
-              publicKey: op.publicKey || op.id,
-              name: op.name || `Operator ${op.publicKey?.substring(0, 4) || op.id?.substring(0, 4)}`,
-              status: op.status || 'Active',
-              stake: op.stake || 0,
-              rewardShare: op.rewardShare || 0.05
+            return operatorKeys.map((key, index) => ({
+              publicKey: key.trim(),
+              name: `Operator ${index + 1}`,
+              status: 'Active',
+              stake: 10000 + (index * 1000), // Mock stake values
+              rewardShare: 0.05
             }));
+
           } catch (cliError) {
             console.error('Error fetching operators from Cambrian CLI:', cliError);
             
             // Try HTTP API as fallback
             const response = await fetch(`${this.avsUrl}/api/operators`);
+            
+            // Check response status before parsing
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
             
             if (!Array.isArray(data)) {
@@ -136,7 +147,7 @@ class CambrianService {
           const mockOperators: NcnOperator[] = [
             {
               publicKey: '8xH3gJxzUXNFE1LfwxKNimvuUKmQUQS8kfAP8VvfbzFE',
-              name: 'Operator 1',
+              name: 'Operator 1', 
               status: 'Active',
               stake: 12500,
               rewardShare: 0.05
@@ -144,7 +155,7 @@ class CambrianService {
             {
               publicKey: '5tGjhqee7vPXmvrZgs9gZGgvU4XJP97UHarWxR3UCpL9',
               name: 'Operator 2',
-              status: 'Active',
+              status: 'Active', 
               stake: 18200,
               rewardShare: 0.05
             },
@@ -299,4 +310,4 @@ class CambrianService {
   }
 }
 
-export default new CambrianService(); 
+export default new CambrianService();
