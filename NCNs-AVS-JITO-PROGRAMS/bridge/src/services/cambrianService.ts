@@ -342,7 +342,7 @@ class CambrianService {
       
       // Initialize the CLI if not done already
       try {
-        await execWithRetry('camb avs fetch-all', 1, 10000);
+        await execWithRetry('camb avs list', 1, 10000);
         console.log('Successfully fetched AVS list');
         
         // Check if our specific AVS is in the list

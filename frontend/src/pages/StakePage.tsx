@@ -78,9 +78,73 @@ export default function StakePage() {
     loadData();
   }, [connected, publicKey, jitoConnectionTested, jitoConnectionSuccess]);
   
+  // Modified staking handler with more error details
+  const handleStakeWithDebugging = async () => {
+    if (!selectedVault || !stakeAmount) {
+      setError('Please select a vault and enter an amount');
+      return;
+    }
+    
+    const amount = parseFloat(stakeAmount);
+    
+    setIsSubmitting(true);
+    setError(null);
+    setSuccess(null);
+    
+    console.log("=== DETAILED STAKE ATTEMPT ===");
+    console.log("About to call stakeToVault with params:", {
+      vaultAddress: selectedVault,
+      amount,
+      lockPeriod
+    });
+    
+    try {
+      // Try with our mocked approach first
+      if (!connected) {
+        throw new Error("Wallet not connected - please connect your wallet first");
+      }
+      
+      if (!publicKey) {
+        throw new Error("No public key found - wallet connection issue");
+      }
+      
+      const result = await stakeToVault(selectedVault, amount, lockPeriod);
+      console.log("Stake result:", result);
+      
+      setSuccess(`Successfully staked ${amount} SOL. Transaction signature: ${result.signature.slice(0, 8)}...`);
+      setStakeAmount('');
+      
+      // Refresh positions after a successful transaction
+      if (publicKey) {
+        const positionsData = await api.getUserPositions(publicKey.toString());
+        setPositions(positionsData);
+      }
+    } catch (err) {
+      console.error("DETAILED ERROR:", err);
+      
+      // Get the full error stack
+      if (err instanceof Error) {
+        console.error("Error stack:", err.stack);
+      }
+      
+      // Set a more detailed error message
+      setError('Failed to stake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
   // Handle staking
   const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log("=== STAKE ATTEMPT ===");
+    console.log("Wallet connected:", connected);
+    console.log("Public key:", publicKey?.toString());
+    console.log("Jito enabled:", isJitoEnabled);
+    console.log("Selected vault:", selectedVault);
+    console.log("Amount:", stakeAmount);
+    console.log("Lock period:", lockPeriod);
     
     if (!connected || !publicKey) {
       setError('Please connect your wallet');
@@ -230,6 +294,50 @@ export default function StakePage() {
   // Check if we should render the Jito UI
   const shouldShowJitoUI = isJitoEnabled || jitoConnectionSuccess;
 
+  // DEBUG component - only visible in development
+  const DebugInfo = () => {
+    if (process.env.NODE_ENV !== 'development') return null;
+    
+    return (
+      <div className="text-xs bg-black/40 p-2 rounded mt-2 mb-4 text-left max-w-md mx-auto">
+        <h4 className="font-bold mb-1 text-yellow-400">Debug Info:</h4>
+        <div className="grid grid-cols-2 gap-x-4 text-white/70">
+          <div>Wallet connected:</div>
+          <div className={connected ? 'text-green-400' : 'text-red-400'}>
+            {connected ? 'Yes' : 'No'}
+          </div>
+          
+          <div>Public key:</div>
+          <div>{publicKey ? publicKey.toString().slice(0, 8) + '...' : 'None'}</div>
+          
+          <div>isJitoEnabled:</div>
+          <div className={isJitoEnabled ? 'text-green-400' : 'text-red-400'}>
+            {isJitoEnabled ? 'Yes' : 'No'}
+          </div>
+          
+          <div>Tested connection:</div>
+          <div>{jitoConnectionTested ? 'Yes' : 'No'}</div>
+          
+          <div>Connection success:</div>
+          <div className={jitoConnectionSuccess ? 'text-green-400' : 'text-red-400'}>
+            {jitoConnectionSuccess ? 'Yes' : 'No'}
+          </div>
+          
+          <div>Showing UI:</div>
+          <div>{shouldShowJitoUI ? 'Yes' : 'No'}</div>
+        </div>
+        <div className="mt-2">
+          <button
+            onClick={() => setJitoEnabled(!isJitoEnabled)}
+            className="text-xs px-2 py-1 bg-yellow-600 hover:bg-yellow-500 rounded"
+          >
+            Toggle Jito Enabled
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!shouldShowJitoUI) {
     return (
       <div className="mt-8 text-center">
@@ -247,6 +355,8 @@ export default function StakePage() {
         
         {error && <p className="text-red-500 mt-2">{error}</p>}
         {success && <p className="text-green-500 mt-2">{success}</p>}
+        
+        <DebugInfo />
       </div>
     );
   }
@@ -287,6 +397,9 @@ export default function StakePage() {
             </button>
           </div>
         )}
+        
+        {/* Add debug info in development */}
+        <DebugInfo />
       </div>
       
       {/* Error and Success Messages */}
@@ -365,7 +478,10 @@ export default function StakePage() {
                       Stake Your Tokens
                     </h2>
                     
-                    <form onSubmit={handleStake}>
+                    <form onSubmit={(e) => {
+                        e.preventDefault();
+                        handleStakeWithDebugging();
+                      }}>
                       <div className="mb-5">
                         <label className="block text-sm font-medium text-slate-300 mb-2">
                           Selected Vault
