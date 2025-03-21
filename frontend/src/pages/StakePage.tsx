@@ -53,16 +53,16 @@ export default function StakePage() {
         
         // Load vaults even if feature flag is off but connection succeeded
         if (jitoConnectionSuccess || features.jitoRestakingEnabled) {
-          // Load vaults
-          const vaultsData = await api.getVaults();
-          setVaults(vaultsData);
-          
-          // Load positions if connected
-          if (connected && publicKey) {
-            const positionsData = await api.getUserPositions(publicKey.toString());
-            setPositions(positionsData);
-          } else {
-            setPositions([]);
+        // Load vaults
+        const vaultsData = await api.getVaults();
+        setVaults(vaultsData);
+        
+        // Load positions if connected
+        if (connected && publicKey) {
+          const positionsData = await api.getUserPositions(publicKey.toString());
+          setPositions(positionsData);
+        } else {
+          setPositions([]);
           }
         } else {
           setError('Jito Restaking is currently disabled');
@@ -175,10 +175,10 @@ export default function StakePage() {
         setStakeAmount('');
         
         // Refresh positions after a successful transaction
-        if (publicKey) {
-          const positionsData = await api.getUserPositions(publicKey.toString());
-          setPositions(positionsData);
-        }
+          if (publicKey) {
+            const positionsData = await api.getUserPositions(publicKey.toString());
+            setPositions(positionsData);
+          }
       } else {
         setError('Failed to stake: Transaction failed');
       }
@@ -223,10 +223,10 @@ export default function StakePage() {
         setUnstakeAmount('');
         
         // Refresh positions after a successful transaction
-        if (publicKey) {
-          const positionsData = await api.getUserPositions(publicKey.toString());
-          setPositions(positionsData);
-        }
+          if (publicKey) {
+            const positionsData = await api.getUserPositions(publicKey.toString());
+            setPositions(positionsData);
+          }
       } else {
         setError('Failed to unstake: Transaction failed');
       }

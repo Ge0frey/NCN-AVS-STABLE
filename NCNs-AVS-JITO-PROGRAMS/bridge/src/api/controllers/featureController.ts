@@ -27,33 +27,33 @@ export async function testJitoConnection(req: Request, res: Response) {
     
     // First attempt with normal timeout
     try {
-      const vaults = await jitoRestakingService.getVaults();
-      let endTime = Date.now();
-      let responseTime = endTime - startTime;
-      
-      if (vaults.length === 0) {
-        console.log('Connected to Jito Restaking, but no vaults were found');
-        return res.json(createApiResponse({
-          success: true,
-          message: 'Connected to Jito Restaking, but no vaults were found',
-          vaultsCount: 0,
+    const vaults = await jitoRestakingService.getVaults();
+    let endTime = Date.now();
+    let responseTime = endTime - startTime;
+    
+    if (vaults.length === 0) {
+      console.log('Connected to Jito Restaking, but no vaults were found');
+      return res.json(createApiResponse({
+        success: true,
+        message: 'Connected to Jito Restaking, but no vaults were found',
+        vaultsCount: 0,
           responseTimeMs: responseTime,
           // Return true to indicate we can use the service, even if it's disabled in config
           shouldEnable: true
-        }));
-      }
-      
-      console.log(`Successfully connected to Jito Restaking, found ${vaults.length} vaults in ${responseTime}ms`);
-      
-      // Check first vault's data for validity
-      let vaultDataValid = vaults[0].balance > 0 || vaults[0].delegatedAmount > 0;
-      
-      return res.json(createApiResponse({
-        success: true,
+      }));
+    }
+    
+    console.log(`Successfully connected to Jito Restaking, found ${vaults.length} vaults in ${responseTime}ms`);
+    
+    // Check first vault's data for validity
+    let vaultDataValid = vaults[0].balance > 0 || vaults[0].delegatedAmount > 0;
+    
+    return res.json(createApiResponse({
+      success: true,
         message: `Successfully connected to Jito Restaking (Found ${vaults.length} vaults)`,
-        vaultsCount: vaults.length,
-        vaultsDataValid: vaultDataValid,
-        responseTimeMs: responseTime,
+      vaultsCount: vaults.length,
+      vaultsDataValid: vaultDataValid,
+      responseTimeMs: responseTime,
         vaultNames: vaults.map(v => v.name),
         // Always return true to indicate we can use the service, even if it's disabled in config
         shouldEnable: true

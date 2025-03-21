@@ -108,112 +108,112 @@ class JitoRestakingService {
       return [];
     }
     
-    try {
-      console.log('Fetching Jito vaults from blockchain...');
-      
-      // Find all vault accounts for the Vault program
-      const vaultAccounts = await this.connection.getProgramAccounts(
-        VAULT_PROGRAM_ID,
-        {
-          // We need the full account data to parse it properly
-          filters: [
-            { dataSize: 800 }, // Approximate size of Vault accounts
-          ],
-        }
-      );
-      
-      console.log(`Found ${vaultAccounts.length} potential vault accounts`);
-      
-      // Process each vault account to get detailed information
-      const vaults: RestakingVault[] = [];
-      
-      for (const { pubkey, account } of vaultAccounts) {
         try {
-          // Instead of relying on SDK parsing, we can extract key information
-          // directly from account data based on our knowledge of the structure
-          // This is a simplified approach. In reality, you'd want to properly
-          // deserialize the account data according to the program's schema.
+          console.log('Fetching Jito vaults from blockchain...');
           
-          // Get vault-associated token accounts
-          const tokenAccounts = await this.connection.getTokenAccountsByOwner(
-            pubkey,
-            { programId: token.TOKEN_PROGRAM_ID }
+          // Find all vault accounts for the Vault program
+          const vaultAccounts = await this.connection.getProgramAccounts(
+            VAULT_PROGRAM_ID,
+            {
+              // We need the full account data to parse it properly
+              filters: [
+                { dataSize: 800 }, // Approximate size of Vault accounts
+              ],
+            }
           );
           
-          if (tokenAccounts.value.length === 0) {
-            continue; // Not a valid vault if it has no token accounts
-          }
+          console.log(`Found ${vaultAccounts.length} potential vault accounts`);
           
-          // Get token balances for vault's token accounts
-          let balance = 0;
-          let tokenMint: PublicKey | null = null;
+          // Process each vault account to get detailed information
+          const vaults: RestakingVault[] = [];
           
-          for (const { pubkey: tokenAccountPubkey, account: tokenAccount } of tokenAccounts.value) {
+          for (const { pubkey, account } of vaultAccounts) {
             try {
-              const tokenAccountInfo = token.AccountLayout.decode(tokenAccount.data);
-              const mintAddress = new PublicKey(tokenAccountInfo.mint);
+              // Instead of relying on SDK parsing, we can extract key information
+              // directly from account data based on our knowledge of the structure
+              // This is a simplified approach. In reality, you'd want to properly
+              // deserialize the account data according to the program's schema.
               
-              // Check if this is a SOL/LST token account (not VRT)
-              if (
-                mintAddress.equals(SOL_MINT) || 
-                mintAddress.equals(JITO_SOL_MINT) || 
-                mintAddress.equals(BSOL_MINT) || 
-                mintAddress.equals(MSOL_MINT)
-              ) {
-                tokenMint = mintAddress;
-                const tokenBalance = await this.connection.getTokenAccountBalance(tokenAccountPubkey);
-                balance += Number(tokenBalance.value.uiAmount || 0);
+              // Get vault-associated token accounts
+              const tokenAccounts = await this.connection.getTokenAccountsByOwner(
+                pubkey,
+                { programId: token.TOKEN_PROGRAM_ID }
+              );
+              
+              if (tokenAccounts.value.length === 0) {
+                continue; // Not a valid vault if it has no token accounts
               }
+              
+              // Get token balances for vault's token accounts
+              let balance = 0;
+              let tokenMint: PublicKey | null = null;
+              
+              for (const { pubkey: tokenAccountPubkey, account: tokenAccount } of tokenAccounts.value) {
+                try {
+                  const tokenAccountInfo = token.AccountLayout.decode(tokenAccount.data);
+                  const mintAddress = new PublicKey(tokenAccountInfo.mint);
+                  
+                  // Check if this is a SOL/LST token account (not VRT)
+                  if (
+                    mintAddress.equals(SOL_MINT) || 
+                    mintAddress.equals(JITO_SOL_MINT) || 
+                    mintAddress.equals(BSOL_MINT) || 
+                    mintAddress.equals(MSOL_MINT)
+                  ) {
+                    tokenMint = mintAddress;
+                    const tokenBalance = await this.connection.getTokenAccountBalance(tokenAccountPubkey);
+                    balance += Number(tokenBalance.value.uiAmount || 0);
+                  }
+                } catch (e) {
+                  console.error(`Error processing token account: ${e}`);
+                }
+              }
+              
+              if (!tokenMint) continue; // Skip if we couldn't determine the mint
+              
+              // Determine the APY
+              const apy = await this.getVaultApy(pubkey.toString());
+              
+              // Determine a name based on the token mint
+              let name = 'Unknown Vault';
+              if (tokenMint.equals(SOL_MINT)) {
+                name = 'SOL Vault';
+              } else if (tokenMint.equals(JITO_SOL_MINT)) {
+                name = 'JitoSOL Vault';
+              } else if (tokenMint.equals(BSOL_MINT)) {
+                name = 'bSOL Vault';
+              } else if (tokenMint.equals(MSOL_MINT)) {
+                name = 'mSOL Vault';
+              } else {
+                name = `Vault-${pubkey.toString().slice(0, 6)}`;
+              }
+              
+              // Calculate an estimate of delegated amount
+              // In a real implementation, this would come from parsing the account data
+              // For now, assume 95% of balance is delegated
+              const delegatedAmount = balance * 0.95;
+              
+              // Add to our list of vaults
+              vaults.push({
+                address: pubkey.toString(),
+                name,
+                balance,
+                delegatedAmount,
+                apy
+              });
             } catch (e) {
-              console.error(`Error processing token account: ${e}`);
+              console.error(`Error processing vault ${pubkey.toString()}: ${e}`);
+              continue;
             }
           }
           
-          if (!tokenMint) continue; // Skip if we couldn't determine the mint
+          console.log(`Successfully processed ${vaults.length} valid vaults`);
           
-          // Determine the APY
-          const apy = await this.getVaultApy(pubkey.toString());
-          
-          // Determine a name based on the token mint
-          let name = 'Unknown Vault';
-          if (tokenMint.equals(SOL_MINT)) {
-            name = 'SOL Vault';
-          } else if (tokenMint.equals(JITO_SOL_MINT)) {
-            name = 'JitoSOL Vault';
-          } else if (tokenMint.equals(BSOL_MINT)) {
-            name = 'bSOL Vault';
-          } else if (tokenMint.equals(MSOL_MINT)) {
-            name = 'mSOL Vault';
-          } else {
-            name = `Vault-${pubkey.toString().slice(0, 6)}`;
-          }
-          
-          // Calculate an estimate of delegated amount
-          // In a real implementation, this would come from parsing the account data
-          // For now, assume 95% of balance is delegated
-          const delegatedAmount = balance * 0.95;
-          
-          // Add to our list of vaults
-          vaults.push({
-            address: pubkey.toString(),
-            name,
-            balance,
-            delegatedAmount,
-            apy
-          });
-        } catch (e) {
-          console.error(`Error processing vault ${pubkey.toString()}: ${e}`);
-          continue;
-        }
-      }
-      
-      console.log(`Successfully processed ${vaults.length} valid vaults`);
-      
       // If no vaults were found on-chain or we're using fallback, provide fallback vaults
       if (vaults.length === 0 || useFallback) {
         console.log('Using fallback real-world vaults data');
-        
-        // Create fallback vaults based on the real Jito vaults data
+            
+            // Create fallback vaults based on the real Jito vaults data
         return this.getFallbackVaults();
       }
       
@@ -236,75 +236,75 @@ class JitoRestakingService {
   private getFallbackVaults(): RestakingVault[] {
     // Create fallback vaults based on the real Jito vaults data
     return [
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'fragSOL Vault',
-        balance: 614166,
-        delegatedAmount: 614166 * 0.95,
-        apy: 8.2, // Estimated APY
-        acceptedTokens: ['mSOL', 'JitoSOL', 'bSOL', 'SOL']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'ezSOL Vault',
-        balance: 427978,
-        delegatedAmount: 427978 * 0.95,
-        apy: 8.1, // Estimated APY
-        acceptedTokens: ['JitoSOL', 'SOL']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'kySOL Vault',
-        balance: 203536,
-        delegatedAmount: 203536 * 0.95,
-        apy: 8.0, // Estimated APY
-        acceptedTokens: ['JitoSOL']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'fragJTO Vault',
-        balance: 4291252,
-        delegatedAmount: 4291252 * 0.95,
-        apy: 7.8, // Estimated APY
-        acceptedTokens: ['JITO']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'kyJTO Vault',
-        balance: 2388191,
-        delegatedAmount: 2388191 * 0.95,
-        apy: 7.7, // Estimated APY
-        acceptedTokens: ['JITO']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'ezJTO Vault',
-        balance: 1762762,
-        delegatedAmount: 1762762 * 0.95,
-        apy: 7.6, // Estimated APY
-        acceptedTokens: ['JITO']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'bzSOL Vault',
-        balance: 146,
-        delegatedAmount: 146 * 0.95,
-        apy: 7.9, // Estimated APY
-        acceptedTokens: ['bSOL']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'dmSOL Vault',
-        balance: 22.08,
-        delegatedAmount: 22.08 * 0.95,
-        apy: 7.5, // Estimated APY
-        acceptedTokens: ['JitoSOL']
-      },
-      {
-        address: new PublicKey(Keypair.generate().publicKey).toString(),
-        name: 'rstSOL Vault',
-        balance: 17.83,
-        delegatedAmount: 17.83 * 0.95,
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'fragSOL Vault',
+                balance: 614166,
+                delegatedAmount: 614166 * 0.95,
+                apy: 8.2, // Estimated APY
+                acceptedTokens: ['mSOL', 'JitoSOL', 'bSOL', 'SOL']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'ezSOL Vault',
+                balance: 427978,
+                delegatedAmount: 427978 * 0.95,
+                apy: 8.1, // Estimated APY
+                acceptedTokens: ['JitoSOL', 'SOL']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'kySOL Vault',
+                balance: 203536,
+                delegatedAmount: 203536 * 0.95,
+                apy: 8.0, // Estimated APY
+                acceptedTokens: ['JitoSOL']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'fragJTO Vault',
+                balance: 4291252,
+                delegatedAmount: 4291252 * 0.95,
+                apy: 7.8, // Estimated APY
+                acceptedTokens: ['JITO']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'kyJTO Vault',
+                balance: 2388191,
+                delegatedAmount: 2388191 * 0.95,
+                apy: 7.7, // Estimated APY
+                acceptedTokens: ['JITO']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'ezJTO Vault',
+                balance: 1762762,
+                delegatedAmount: 1762762 * 0.95,
+                apy: 7.6, // Estimated APY
+                acceptedTokens: ['JITO']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'bzSOL Vault',
+                balance: 146,
+                delegatedAmount: 146 * 0.95,
+                apy: 7.9, // Estimated APY
+                acceptedTokens: ['bSOL']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'dmSOL Vault',
+                balance: 22.08,
+                delegatedAmount: 22.08 * 0.95,
+                apy: 7.5, // Estimated APY
+                acceptedTokens: ['JitoSOL']
+              },
+              {
+                address: new PublicKey(Keypair.generate().publicKey).toString(),
+                name: 'rstSOL Vault',
+                balance: 17.83,
+                delegatedAmount: 17.83 * 0.95,
         apy: 7.2, // Estimated APY
         acceptedTokens: ['SOL']
       }
