@@ -78,10 +78,57 @@ export async function getFeatureFlags() {
 export async function testJitoConnection() {
   logDebug('Testing Jito connection');
   try {
-    return await fetchAPI<{success: boolean; message: string; vaultsCount?: number}>('/features/test-jito');
+    // Try first with a short timeout for quick response
+    try {
+      return await fetchAPI<{
+        success: boolean; 
+        message: string; 
+        vaultsCount?: number;
+        vaultsDataValid?: boolean;
+        responseTimeMs?: number;
+        shouldEnable?: boolean;
+        retried?: boolean;
+      }>('/features/test-jito');
+    } catch (error) {
+      // If it times out or fails, try again with a longer timeout
+      console.warn('First Jito connection attempt failed, retrying with extended timeout:', error);
+      
+      // Create an AbortController with longer timeout for retry
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT * 2);
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/features/test-jito`, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          throw new Error(data.error || 'API request failed');
+        }
+        
+        return data.data;
+      } catch (retryError) {
+        throw retryError;
+      }
+    }
   } catch (error) {
-    console.error('Failed to test Jito connection:', error);
-    throw error;
+    console.error('Failed to test Jito connection after retry:', error);
+    // Return a formatted error object instead of throwing
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Unknown error connecting to Jito service',
+      shouldEnable: false
+    };
   }
 }
 
@@ -112,12 +159,44 @@ export async function getOperators() {
 // Restaking services
 export async function getVaults() {
   try {
-    return await fetchAPI<Array<{address: string; name: string; balance: number; delegatedAmount: number; apy: number}>>(
+    const vaults = await fetchAPI<Array<{address: string; name: string; balance: number; delegatedAmount: number; apy: number}>>(
       '/restaking/vaults'
     );
+    
+    logDebug('Retrieved vaults:', vaults);
+    return vaults;
   } catch (error) {
     console.error('Failed to fetch vaults:', error);
-    // Return empty array instead of throwing
+    
+    // Return mock vaults only in development to help with UI testing
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Using mock vaults data for development');
+      return [
+        {
+          address: 'vault111111111111111111111111111111111111111',
+          name: 'Jito Vault (High Yield)',
+          balance: 234567.89,
+          delegatedAmount: 123456.78,
+          apy: 5.67
+        },
+        {
+          address: 'vault222222222222222222222222222222222222222',
+          name: 'Jito Vault (Community)',
+          balance: 987654.32,
+          delegatedAmount: 765432.1,
+          apy: 4.5
+        },
+        {
+          address: 'vault333333333333333333333333333333333333333',
+          name: 'Jito Vault (Stable Yield)',
+          balance: 543210.98,
+          delegatedAmount: 432109.87,
+          apy: 3.21
+        }
+      ];
+    }
+    
+    // In production, return empty array
     return [];
   }
 }

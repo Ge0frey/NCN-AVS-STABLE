@@ -20,7 +20,7 @@ interface Position {
 }
 
 export default function StakePage() {
-  const { publicKey, connected, isJitoEnabled } = useWalletContext();
+  const { publicKey, connected, isJitoEnabled, setJitoEnabled, stakeToVault, unstakeFromVault } = useWalletContext();
   const [activeTab, setActiveTab] = useState<'jito' | 'regular'>('jito');
   const [vaults, setVaults] = useState<Vault[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -33,6 +33,8 @@ export default function StakePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [jitoConnectionTested, setJitoConnectionTested] = useState<boolean>(false);
+  const [jitoConnectionSuccess, setJitoConnectionSuccess] = useState<boolean>(false);
 
   // Load vaults and positions
   useEffect(() => {
@@ -44,22 +46,26 @@ export default function StakePage() {
         // Check if Jito is enabled
         const features = await api.getFeatureFlags();
         
-        if (!features.jitoRestakingEnabled) {
-          setError('Jito Restaking is currently disabled');
-          setIsLoading(false);
-          return;
+        // First check if need to test connection
+        if (!jitoConnectionTested && !jitoConnectionSuccess) {
+          await testApiConnection();
         }
         
-        // Load vaults
-        const vaultsData = await api.getVaults();
-        setVaults(vaultsData);
-        
-        // Load positions if connected
-        if (connected && publicKey) {
-          const positionsData = await api.getUserPositions(publicKey.toString());
-          setPositions(positionsData);
+        // Load vaults even if feature flag is off but connection succeeded
+        if (jitoConnectionSuccess || features.jitoRestakingEnabled) {
+          // Load vaults
+          const vaultsData = await api.getVaults();
+          setVaults(vaultsData);
+          
+          // Load positions if connected
+          if (connected && publicKey) {
+            const positionsData = await api.getUserPositions(publicKey.toString());
+            setPositions(positionsData);
+          } else {
+            setPositions([]);
+          }
         } else {
-          setPositions([]);
+          setError('Jito Restaking is currently disabled');
         }
       } catch (err) {
         setError('Failed to load staking data');
@@ -70,7 +76,7 @@ export default function StakePage() {
     };
     
     loadData();
-  }, [connected, publicKey]);
+  }, [connected, publicKey, jitoConnectionTested, jitoConnectionSuccess]);
   
   // Handle staking
   const handleStake = async (e: React.FormEvent) => {
@@ -97,31 +103,24 @@ export default function StakePage() {
     setSuccess(null);
     
     try {
-      // Instead of calling the API endpoint, we should execute a wallet transaction directly
-      // For demonstration purposes, we'll show a success message
-      // In a real implementation, this would send a transaction via the connected wallet
+      // Use the real blockchain interaction instead of simulation
+      const result = await stakeToVault(selectedVault, amount, lockPeriod);
       
-      console.log(`Creating stake transaction for vault ${selectedVault}, amount: ${amount}, lock period: ${lockPeriod}`);
-      
-      // Simulate a successful transaction after a short delay
-      setTimeout(() => {
-        setSuccess(`Successfully initiated staking of ${amount} SOL. Please check your wallet for transaction confirmation.`);
+      if (result.success) {
+        setSuccess(`Successfully staked ${amount} SOL. Transaction signature: ${result.signature.slice(0, 8)}...`);
         setStakeAmount('');
         
-        // In a real implementation, you would wait for transaction confirmation
-        // before refreshing the positions
-        setTimeout(async () => {
-          if (publicKey) {
-            const positionsData = await api.getUserPositions(publicKey.toString());
-            setPositions(positionsData);
-          }
-        }, 2000);
-        
-        setIsSubmitting(false);
-      }, 1500);
-      
+        // Refresh positions after a successful transaction
+        if (publicKey) {
+          const positionsData = await api.getUserPositions(publicKey.toString());
+          setPositions(positionsData);
+        }
+      } else {
+        setError('Failed to stake: Transaction failed');
+      }
     } catch (err) {
       setError('Failed to stake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -152,36 +151,29 @@ export default function StakePage() {
     setSuccess(null);
     
     try {
-      // Instead of calling the API endpoint, we should execute a wallet transaction directly
-      // For demonstration purposes, we'll show a success message
-      // In a real implementation, this would send a transaction via the connected wallet
+      // Use the real blockchain interaction instead of simulation
+      const result = await unstakeFromVault(position.vaultAddress, amount);
       
-      console.log(`Creating unstake transaction for vault ${position.vaultAddress}, amount: ${amount}`);
-      
-      // Simulate a successful transaction after a short delay
-      setTimeout(() => {
-        setSuccess(`Successfully initiated unstaking of ${amount} SOL. Please check your wallet for transaction confirmation.`);
+      if (result.success) {
+        setSuccess(`Successfully unstaked ${amount} SOL. Transaction signature: ${result.signature.slice(0, 8)}...`);
         setUnstakeAmount('');
         
-        // In a real implementation, you would wait for transaction confirmation
-        // before refreshing the positions
-        setTimeout(async () => {
-          if (publicKey) {
-            const positionsData = await api.getUserPositions(publicKey.toString());
-            setPositions(positionsData);
-          }
-        }, 2000);
-        
-        setIsSubmitting(false);
-      }, 1500);
-      
+        // Refresh positions after a successful transaction
+        if (publicKey) {
+          const positionsData = await api.getUserPositions(publicKey.toString());
+          setPositions(positionsData);
+        }
+      } else {
+        setError('Failed to unstake: Transaction failed');
+      }
     } catch (err) {
       setError('Failed to unstake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Add a function to test the API connection
+  // Updated API connection test that enables the UI on success
   const testApiConnection = async () => {
     try {
       setIsLoading(true);
@@ -191,20 +183,54 @@ export default function StakePage() {
       const result = await api.testJitoConnection();
       console.log('Jito API connection test result:', result);
       
+      // Set connection tested flag
+      setJitoConnectionTested(true);
+      
       if (result.success) {
-        setSuccess(`Jito API connection successful: ${result.message}${result.vaultsCount ? ` (Found ${result.vaultsCount} vaults)` : ''}`);
+        // Show detailed success message
+        const detailsMessage = result.retried 
+          ? ' (after retry)' 
+          : '';
+        const vaultsMessage = result.vaultsCount 
+          ? ` (Found ${result.vaultsCount} vaults)` 
+          : '';
+          
+        setSuccess(`Jito API connection successful${detailsMessage}: ${result.message}${vaultsMessage}`);
+        setJitoConnectionSuccess(true);
+        
+        // Check if backend recommends enabling Jito
+        if (result.shouldEnable) {
+          console.log('Backend recommends enabling Jito client based on API test');
+          // Forcibly enable Jito in the wallet context
+          setJitoEnabled(true);
+        }
+        
+        // Load vaults after successful connection
+        const vaultsData = await api.getVaults();
+        setVaults(vaultsData);
+        
+        // Load positions if connected
+        if (connected && publicKey) {
+          const positionsData = await api.getUserPositions(publicKey.toString());
+          setPositions(positionsData);
+        }
       } else {
         setError(`Jito API connection test failed: ${result.message}`);
+        setJitoConnectionSuccess(false);
       }
     } catch (err) {
       console.error('API connection failed:', err);
       setError('API connection failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      setJitoConnectionSuccess(false);
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isJitoEnabled) {
+  // Check if we should render the Jito UI
+  const shouldShowJitoUI = isJitoEnabled || jitoConnectionSuccess;
+
+  if (!shouldShowJitoUI) {
     return (
       <div className="mt-8 text-center">
         <h2 className="text-2xl font-bold mb-4">Jito Restaking</h2>
@@ -241,6 +267,26 @@ export default function StakePage() {
             Earn higher yields by staking your SOL in Jito vaults. Choose from various vaults with different risk profiles and lock periods to maximize your returns.
           </p>
         </div>
+        
+        {/* Add a small success indicator for API connection */}
+        {jitoConnectionSuccess && (
+          <div className="mt-3 text-sm text-green-400 flex items-center justify-center animate-fadeIn">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Connected to Jito Restaking Service
+            
+            {/* Add a retry button for retesting */}
+            <button 
+              onClick={testApiConnection}
+              className="ml-2 px-1.5 py-0.5 text-xs bg-green-800/40 hover:bg-green-700/50 rounded transition-colors"
+              disabled={isLoading}
+              title="Retest connection"
+            >
+              {isLoading ? 'Testing...' : 'Retest'}
+            </button>
+          </div>
+        )}
       </div>
       
       {/* Error and Success Messages */}

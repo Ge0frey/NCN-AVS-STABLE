@@ -3,8 +3,37 @@ import { promisify } from 'util';
 import { OracleData, NcnOperator } from '../types';
 import config from '../config/env';
 import { withFeatureFlag } from '../utils';
+import fs from 'fs';
+import path from 'path';
 
 const execAsync = promisify(exec);
+
+// Add retry and timeout logic to exec command
+const execWithRetry = async (command: string, retries = 3, timeout = 5000): Promise<string> => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      // Set timeout for the command execution
+      const { stdout } = await Promise.race([
+        execAsync(command),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error(`Command timed out after ${timeout}ms`)), timeout);
+        })
+      ]);
+      
+      return stdout;
+    } catch (error) {
+      console.warn(`Attempt ${attempt + 1}/${retries} failed:`, error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  throw lastError || new Error('Command failed after retries');
+};
 
 /**
  * Service for interacting with Cambrian SDK
@@ -13,11 +42,18 @@ class CambrianService {
   private avsUrl: string;
   private isEnabled: boolean;
   private avsId: string;
+  private isInitialized: boolean;
   
   constructor() {
-    this.avsUrl = config.CAMBRIAN_AVS_HTTP_URL;
+    this.avsUrl = config.CAMBRIAN_AVS_HTTP_URL || 'http://localhost:8999';
     this.isEnabled = config.FEATURE_FLAG_NCN_ENABLED;
     this.avsId = process.env.CAMBRIAN_AVS_ID || '9SDa7sMDqCDjSGQyjhMHHde6bvENWS68HVzQqqsAhrus';
+    this.isInitialized = false;
+    
+    // Try to initialize the AVS connection on service startup
+    this.initializeAvs().catch(error => {
+      console.error('Failed to initialize Cambrian AVS on startup:', error);
+    });
   }
 
   /**
@@ -28,15 +64,28 @@ class CambrianService {
       this.isEnabled,
       async () => {
         try {
+          // Ensure AVS is initialized
+          if (!this.isInitialized) {
+            try {
+              await this.initializeAvs();
+            } catch (initError) {
+              console.error('Failed to initialize AVS before getting oracle data:', initError);
+              // Continue anyway - will use fallbacks
+            }
+          }
+          
           // Try to get real oracle data from Cambrian AVS
           try {
             // Use Cambrian CLI to fetch oracle data
-            const { stdout } = await execAsync(`camb oracle get-price -a ${assetId} -u ${this.avsId}`);
+            console.log(`Fetching oracle data for ${assetId} from AVS ${this.avsId}`);
+            const stdout = await execWithRetry(`camb oracle get-price -a ${assetId} -u ${this.avsId}`, 2, 3000);
             const data = JSON.parse(stdout.trim()); // Add trim() to handle whitespace
             
             if (!data || !data.price) {
               throw new Error('Invalid oracle data from Cambrian CLI');
             }
+            
+            console.log(`Successfully fetched oracle data for ${assetId}:`, data);
             
             return {
               assetId,
@@ -49,35 +98,43 @@ class CambrianService {
             console.error('Error fetching oracle data from Cambrian CLI:', cliError);
             
             // Try HTTP API as fallback
-            const response = await fetch(`${this.avsUrl}/api/oracle/${assetId}`);
-            
-            // Check response status before parsing
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
+            try {
+              console.log(`Trying HTTP API fallback for ${assetId} at ${this.avsUrl}/api/oracle/${assetId}`);
+              const response = await fetch(`${this.avsUrl}/api/oracle/${assetId}`);
+              
+              // Check response status before parsing
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              
+              if (!data || !data.price) {
+                throw new Error('Invalid oracle data from HTTP API');
+              }
+              
+              console.log(`Successfully fetched oracle data from HTTP API:`, data);
+              
+              return {
+                assetId,
+                price: data.price,
+                timestamp: data.timestamp || Date.now(),
+                source: data.source || 'Cambrian NCN Oracle API',
+                confidence: data.confidence || 0.95
+              };
+            } catch (httpError) {
+              console.error('Error fetching from HTTP API:', httpError);
+              throw httpError; // Let the outer catch handle the fallback
             }
-            
-            const data = await response.json();
-            
-            if (!data || !data.price) {
-              throw new Error('Invalid oracle data from HTTP API');
-            }
-            
-            return {
-              assetId,
-              price: data.price,
-              timestamp: data.timestamp || Date.now(),
-              source: data.source || 'Cambrian NCN Oracle',
-              confidence: data.confidence || 0.95
-            };
           }
         } catch (error) {
           console.error('Error fetching oracle data:', error);
           
           // Fallback to mock data if real data fetch fails
-          console.log('Using mock oracle data');
+          console.log('Using mock oracle data for', assetId);
           const mockOracleData: OracleData = {
             assetId,
-            price: assetId === 'jitosol' ? 45.23 : 1.00,
+            price: assetId === 'jitosol' ? 45.23 : (assetId === 'stablebond' ? 1.00 : 25.50),
             timestamp: Date.now(),
             source: 'Cambrian NCN Oracle (Mock)',
             confidence: 0.95
@@ -254,60 +311,79 @@ class CambrianService {
   }
 
   /**
-   * Initializes the Cambrian AVS (for admin purposes)
+   * Initialize and check the connection to the Cambrian AVS
    */
   async initializeAvs(): Promise<boolean> {
-    return withFeatureFlag(
-      this.isEnabled,
-      async () => {
-        try {
-          console.log(`Initializing AVS ${this.avsId}`);
-          
-          try {
-            // Use Cambrian CLI to initialize the AVS
-            const { stdout } = await execAsync(
-              `camb avs run -u ${this.avsId}`
-            );
-            console.log('AVS initialization output:', stdout);
-            return true;
-          } catch (execError) {
-            console.error('Error executing Cambrian CLI command:', execError);
-            
-            // Try HTTP API as fallback
-            try {
-              const response = await fetch(`${this.avsUrl}/api/avs/initialize`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  avsId: this.avsId
-                })
-              });
-              
-              const data = await response.json();
-              
-              if (!data.success) {
-                throw new Error(data.error || 'Failed to initialize AVS via HTTP API');
-              }
-              
-              return true;
-            } catch (apiError) {
-              console.error('Error initializing AVS via HTTP API:', apiError);
-              
-              // Return true for development purposes
-              console.log('Using mock initialization data');
-              return true;
-            }
-          }
-        } catch (error) {
-          console.error('Error initializing AVS:', error);
-          return false;
+    if (!this.isEnabled) {
+      console.log('Cambrian AVS is disabled by feature flag');
+      return false;
+    }
+    
+    try {
+      console.log('Initializing Cambrian AVS connection...');
+      
+      // Check if the Cambrian CLI is installed
+      try {
+        const versionOutput = await execWithRetry('camb --version', 1, 2000);
+        console.log('Cambrian CLI version:', versionOutput.trim());
+      } catch (error) {
+        console.error('Cambrian CLI not found or not working properly.');
+        throw new Error('Cambrian CLI not available: ' + (error instanceof Error ? error.message : String(error)));
+      }
+      
+      // Check if config directory exists
+      const configDir = path.join(process.env.HOME || '/tmp', '.config', 'cambrian');
+      const configExists = fs.existsSync(configDir);
+      
+      if (!configExists) {
+        console.log('Creating Cambrian config directory...');
+        fs.mkdirSync(configDir, { recursive: true });
+      }
+      
+      // Initialize the CLI if not done already
+      try {
+        await execWithRetry('camb avs fetch-all', 1, 10000);
+        console.log('Successfully fetched AVS list');
+        
+        // Check if our specific AVS is in the list
+        const avsListOutput = await execWithRetry('camb avs list', 1, 5000);
+        
+        if (!avsListOutput.includes(this.avsId)) {
+          console.warn(`Warning: AVS ID ${this.avsId} not found in AVS list`);
+        } else {
+          console.log(`AVS ${this.avsId} found in list`);
         }
-      },
-      false
-    )();
+        
+        // Try to connect to the AVS via HTTP API
+        try {
+          const response = await fetch(`${this.avsUrl}/api/health`);
+          
+          if (!response.ok) {
+            throw new Error(`AVS HTTP healthcheck failed: ${response.status}`);
+          }
+          
+          const healthData = await response.json();
+          console.log('AVS healthcheck response:', healthData);
+        } catch (httpError) {
+          console.warn('AVS HTTP API not available, will rely on CLI only:', httpError);
+        }
+        
+        this.isInitialized = true;
+        console.log('Cambrian AVS initialized successfully.');
+        return true;
+      } catch (initError) {
+        console.error('Error initializing Cambrian AVS:', initError);
+        this.isInitialized = false;
+        throw initError;
+      }
+    } catch (error) {
+      console.error('Failed to initialize Cambrian AVS:', error);
+      this.isInitialized = false;
+      return false;
+    }
   }
 }
 
-export default new CambrianService();
+// Export singleton instance
+const cambrianService = new CambrianService();
+export default cambrianService;

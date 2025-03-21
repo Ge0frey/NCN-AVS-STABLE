@@ -60,14 +60,30 @@ export function safeJsonParse<T>(json: string, fallback: T): T {
 export function withFeatureFlag<T, Args extends any[]>(
   featureEnabled: boolean,
   fn: (...args: Args) => Promise<T>,
-  fallbackValue: T
+  fallbackValue?: T
 ): (...args: Args) => Promise<T> {
   return async (...args: Args): Promise<T> => {
     if (!featureEnabled) {
-      return fallbackValue;
+      if (fallbackValue !== undefined) {
+        return fallbackValue;
+      }
+      throw new Error('Feature is disabled');
     }
     return await fn(...args);
   };
+}
+
+/**
+ * Executes a function only if the feature flag is enabled
+ */
+export async function withFeatureCheck<T>(
+  featureEnabled: boolean,
+  fn: () => Promise<T>
+): Promise<T | undefined> {
+  if (!featureEnabled) {
+    return undefined;
+  }
+  return await fn();
 }
 
 /**

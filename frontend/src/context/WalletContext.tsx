@@ -1,21 +1,22 @@
 import { createContext, useContext, ReactNode, useState, useEffect, useCallback } from 'react';
 import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
+import { Connection, PublicKey, clusterApiUrl, Transaction } from '@solana/web3.js';
 // Comment out the actual import and create a mock class
 // import { RestakingClient } from '@jito-foundation/restaking-sdk';
+import { RestakingClient } from '@jito-foundation/restaking-sdk';
 import api from '../services/api';
 
 // Mock RestakingClient for development
-class RestakingClient {
-  connection: Connection;
-  
-  constructor(connection: Connection) {
-    this.connection = connection;
-  }
-  
-  // Add any methods you need to mock
-}
+// class RestakingClient {
+//   connection: Connection;
+//   
+//   constructor(connection: Connection) {
+//     this.connection = connection;
+//   }
+//   
+//   // Add any methods you need to mock
+// }
 
 interface WalletContextProps extends WalletContextState {
   connection: Connection | null;
@@ -27,7 +28,10 @@ interface WalletContextProps extends WalletContextState {
   refreshBalance: () => Promise<void>;
   jitoClient: RestakingClient | null;
   isJitoEnabled: boolean;
+  setJitoEnabled: (enabled: boolean) => void;
   fetchJitoData: () => Promise<void>;
+  stakeToVault: (vaultAddress: string, amount: number, lockPeriod?: number) => Promise<{ success: boolean; signature: string }>;
+  unstakeFromVault: (vaultAddress: string, amount: number) => Promise<{ success: boolean; signature: string }>;
 }
 
 const WalletContext = createContext<WalletContextProps | undefined>(undefined);
@@ -140,6 +144,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (!connection || !isMounted) return;
       
       try {
+        // Always try to create a client regardless of feature flags
+        // This ensures we have a client available when manually enabling Jito
+        if (!jitoClient) {
+          const client = new RestakingClient(connection);
+          setJitoClient(client);
+          logDebug('Jito Restaking client created');
+        }
+        
         // Use a timeout for the API call to prevent blocking
         const timeoutPromise = new Promise<null>((_, reject) => {
           setTimeout(() => {
@@ -154,17 +166,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         
         if (features) {
           setIsJitoEnabled(features.jitoRestakingEnabled);
-          
-          if (features.jitoRestakingEnabled && connection) {
-            const client = new RestakingClient(connection);
-            setJitoClient(client);
-            logDebug('Jito Restaking client initialized successfully');
-          }
+          logDebug(`Jito Restaking feature flag: ${features.jitoRestakingEnabled}`);
         }
       } catch (error) {
-        console.error('Failed to initialize Jito client:', error);
+        console.error('Failed to initialize Jito client or fetch feature flags:', error);
         if (isMounted) {
-          setJitoClient(null);
+          // Keep any existing client even if we couldn't fetch feature flags
+          if (!jitoClient) {
+            try {
+              const client = new RestakingClient(connection);
+              setJitoClient(client);
+              logDebug('Created Jito client despite feature flag error');
+            } catch (clientError) {
+              console.error('Failed to create Jito client:', clientError);
+              setJitoClient(null);
+            }
+          }
           setIsJitoEnabled(false);
         }
       }
@@ -178,6 +195,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     };
   }, [connection]);
+
+  // Add method to manually enable Jito
+  const setJitoEnabled = (enabled: boolean) => {
+    if (enabled && connection && !jitoClient) {
+      // Create client if enabling and no client exists
+      try {
+        const client = new RestakingClient(connection);
+        setJitoClient(client);
+        setIsJitoEnabled(true);
+        logDebug('Jito Restaking client manually initialized');
+      } catch (error) {
+        console.error('Failed to manually initialize Jito client:', error);
+        return false;
+      }
+    } else {
+      // Simply update the enabled state
+      setIsJitoEnabled(enabled);
+    }
+    return true;
+  };
 
   // Update balance when wallet changes
   const refreshBalance = useCallback(async () => {
@@ -208,17 +245,113 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [wallet.connected, refreshBalance]);
 
-  // Add fetchJitoData method
+  // Update fetchJitoData method
   const fetchJitoData = async () => {
     if (!isJitoEnabled || !connection || !wallet.publicKey) {
       return;
     }
     
     try {
+      setIsLoading(true);
       // This method can be used by components that need Jito data
       logDebug('Fetching Jito data...');
+      
+      // Actually fetch real data from the blockchain
+      if (jitoClient) {
+        // Get user position directly from blockchain
+        const positions = await jitoClient.getStakerPositions(wallet.publicKey);
+        // Get vault data directly from blockchain
+        const vaults = await jitoClient.getAllVaults();
+        
+        logDebug('Fetched positions and vaults', { positions, vaults });
+      }
     } catch (error) {
       console.error('Error fetching Jito data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add a method to interact with the blockchain for staking
+  const stakeToVault = async (vaultAddress: string, amount: number, lockPeriod: number = 0) => {
+    if (!connection || !jitoClient || !wallet.publicKey || !wallet.signTransaction) {
+      throw new Error('Wallet not connected or Jito not enabled');
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // Create the transaction instructions
+      const instructions = await jitoClient.createStakeInstructions(
+        wallet.publicKey,
+        new PublicKey(vaultAddress),
+        amount * 10 ** 9, // Convert SOL to lamports
+        lockPeriod
+      );
+      
+      // Create a transaction from the instructions
+      const latestBlockhash = await connection.getLatestBlockhash();
+      const transaction = new Transaction().add(...instructions);
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = wallet.publicKey;
+      
+      // Sign and send the transaction
+      const signedTransaction = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      
+      // Wait for confirmation
+      await connection.confirmTransaction(signature);
+      
+      // Refresh data
+      await fetchJitoData();
+      
+      return { success: true, signature };
+    } catch (error) {
+      console.error('Error staking to vault:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add a method to interact with the blockchain for unstaking
+  const unstakeFromVault = async (vaultAddress: string, amount: number) => {
+    if (!connection || !jitoClient || !wallet.publicKey || !wallet.signTransaction) {
+      throw new Error('Wallet not connected or Jito not enabled');
+    }
+    
+    try {
+      setIsLoading(true);
+      
+      // Create the transaction instructions
+      const instructions = await jitoClient.createUnstakeInstructions(
+        wallet.publicKey,
+        new PublicKey(vaultAddress),
+        amount * 10 ** 9 // Convert SOL to lamports
+      );
+      
+      // Create a transaction from the instructions
+      const latestBlockhash = await connection.getLatestBlockhash();
+      const transaction = new Transaction().add(...instructions);
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = wallet.publicKey;
+      
+      // Sign and send the transaction
+      const signedTransaction = await wallet.signTransaction(transaction);
+      const signature = await connection.sendRawTransaction(signedTransaction.serialize());
+      
+      // Wait for confirmation
+      await connection.confirmTransaction(signature);
+      
+      // Refresh data
+      await fetchJitoData();
+      
+      return { success: true, signature };
+    } catch (error) {
+      console.error('Error unstaking from vault:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -233,7 +366,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     refreshBalance,
     jitoClient,
     isJitoEnabled,
+    setJitoEnabled,
     fetchJitoData,
+    stakeToVault,
+    unstakeFromVault,
   };
 
   return (

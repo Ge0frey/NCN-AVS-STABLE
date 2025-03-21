@@ -19,6 +19,13 @@ interface HistoryPoint {
   value: number;
 }
 
+interface OracleData {
+  price: number;
+  source: string;
+  timestamp: string;
+  confidence: number;
+}
+
 // Initial empty state
 const initialCollateralState = {
   totalCollateralValue: 0,
@@ -53,9 +60,61 @@ export default function CollateralPage() {
   const [collateralData, setCollateralData] = useState(initialCollateralState);
   
   // Add oracle price state
-  const [oraclePrices, setOraclePrices] = useState<Record<string, number>>({});
+  const [oraclePrices, setOraclePrices] = useState<Record<string, OracleData>>({});
   const [isOracleEnabled, setIsOracleEnabled] = useState<boolean>(false);
   const [isLoadingOracle, setIsLoadingOracle] = useState<boolean>(false);
+
+  // Add useEffect to fetch oracle prices - make sure this is correctly running
+  useEffect(() => {
+    const fetchOraclePrices = async () => {
+      setIsLoadingOracle(true);
+      
+      try {
+        // Check if NCN features are enabled
+        const features = await api.getFeatureFlags();
+        
+        setIsOracleEnabled(features.ncnEnabled);
+        
+        if (features.ncnEnabled) {
+          // Fetch oracle prices for each asset
+          const prices: Record<string, OracleData> = {};
+          
+          const fetchPromises = initialCollateralState.collateralAssets.map(async (asset) => {
+            try {
+              const data = await api.getAssetPrice(asset.id);
+              if (data) {
+                prices[asset.id] = data;
+              }
+            } catch (err) {
+              console.error(`Failed to fetch price for ${asset.id}:`, err);
+            }
+          });
+          
+          // Wait for all fetch operations to complete
+          await Promise.allSettled(fetchPromises);
+          
+          setOraclePrices(prices);
+          
+          // Log the oracle data
+          console.log('Oracle data fetched successfully:', prices);
+        }
+      } catch (error) {
+        console.error('Failed to fetch oracle prices:', error);
+        setIsOracleEnabled(false);
+      } finally {
+        setIsLoadingOracle(false);
+      }
+    };
+    
+    fetchOraclePrices();
+    
+    // Set up a periodic refresh (every 60 seconds)
+    const refreshInterval = setInterval(fetchOraclePrices, 60000);
+    
+    return () => {
+      clearInterval(refreshInterval);
+    };
+  }, []);
 
   // Load collateral data
   useEffect(() => {
@@ -76,30 +135,37 @@ export default function CollateralPage() {
         // Create a copy of the initial state to update
         const updatedCollateralData = { ...initialCollateralState };
         
-        // Update JitoSOL balance with real data
-        const jitoSolAsset = updatedCollateralData.collateralAssets.find(asset => asset.id === 'jitosol');
-        if (jitoSolAsset) {
-          jitoSolAsset.balance = jitoSolBalance;
+        // Update each collateral asset with oracle data if available
+        updatedCollateralData.collateralAssets = updatedCollateralData.collateralAssets.map(asset => {
+          const updatedAsset = { ...asset };
           
-          // Use oracle price if available
-          if (oraclePrices['jitosol']) {
-            jitoSolAsset.price = oraclePrices['jitosol'];
-            jitoSolAsset.value = jitoSolBalance * oraclePrices['jitosol'];
+          // Update JitoSOL balance with real data
+          if (asset.id === 'jitosol') {
+            updatedAsset.balance = jitoSolBalance;
           }
-        }
-        
-        // Update Stablebond with oracle price if available
-        const stablebondAsset = updatedCollateralData.collateralAssets.find(asset => asset.id === 'stablebond');
-        if (stablebondAsset && oraclePrices['stablebond']) {
-          stablebondAsset.price = oraclePrices['stablebond'];
-          // Note: We don't have real stablebond balance data yet
-        }
+          
+          // Use oracle price data if available
+          if (oraclePrices[asset.id]) {
+            updatedAsset.price = oraclePrices[asset.id].price;
+            updatedAsset.value = asset.balance * oraclePrices[asset.id].price;
+          }
+          
+          return updatedAsset;
+        });
         
         // Calculate total collateral value
         updatedCollateralData.totalCollateralValue = updatedCollateralData.collateralAssets.reduce(
           (total, asset) => total + asset.value, 
           0
         );
+        
+        // Calculate collateral ratio (if there's any debt)
+        const totalDebt = 0; // This would come from a real API call in a full implementation
+        if (totalDebt > 0) {
+          updatedCollateralData.collateralRatio = (updatedCollateralData.totalCollateralValue / totalDebt) * 100;
+        } else {
+          updatedCollateralData.collateralRatio = 999; // Arbitrary high number when there's no debt
+        }
         
         setCollateralData(updatedCollateralData);
       } catch (error) {
@@ -110,46 +176,7 @@ export default function CollateralPage() {
     };
     
     loadCollateralData();
-  }, [balance, connected, publicKey, oraclePrices]);
-  
-  // Add useEffect to fetch oracle prices
-  useEffect(() => {
-    const fetchOraclePrices = async () => {
-      setIsLoadingOracle(true);
-      
-      try {
-        // Check if NCN features are enabled
-        const features = await api.getFeatureFlags();
-        
-        setIsOracleEnabled(features.ncnEnabled);
-        
-        if (features.ncnEnabled) {
-          // Fetch oracle prices for each asset
-          const prices: Record<string, number> = {};
-          
-          for (const asset of initialCollateralState.collateralAssets) {
-            try {
-              const data = await api.getAssetPrice(asset.id);
-              if (data && data.price) {
-                prices[asset.id] = data.price;
-              }
-            } catch (err) {
-              console.error(`Failed to fetch price for ${asset.id}:`, err);
-            }
-          }
-          
-          setOraclePrices(prices);
-        }
-      } catch (error) {
-        console.error('Failed to fetch oracle prices:', error);
-        setIsOracleEnabled(false);
-      } finally {
-        setIsLoadingOracle(false);
-      }
-    };
-    
-    fetchOraclePrices();
-  }, []);
+  }, [connected, publicKey, oraclePrices]); // Make sure this runs when oracle prices update
 
   // Calculate health status based on collateralization ratio
   const getHealthStatus = (ratio: number) => {
@@ -320,64 +347,85 @@ export default function CollateralPage() {
       {/* Collateral Assets */}
       <div className="mb-8">
         <h2 className="mb-4 text-xl font-bold">Your Collateral Assets</h2>
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="collateral-assets grid grid-cols-1 sm:grid-cols-2 gap-6">
           {collateralData.collateralAssets.map((asset) => (
-            <div key={asset.id} className="card transition-all hover:shadow-md">
-              <div className="mb-4 flex items-center">
-                <div className="mr-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-2xl dark:bg-slate-700">
-                  {asset.icon}
+            <div key={asset.id} className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <div className="text-2xl">{asset.icon}</div>
+                  <div>
+                    <h3 className="font-semibold text-white">{asset.name}</h3>
+                    <div className="text-sm text-slate-400">Balance: {asset.balance.toFixed(4)}</div>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold">{asset.name}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
-                    APY: <span className="text-green-500 dark:text-green-400">{asset.apy}%</span>
-                  </p>
-                </div>
-              </div>
-              <div className="mb-4 grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Balance</p>
-                  <p className="font-medium">{asset.balance.toLocaleString()} {asset.id === 'jitosol' ? 'JitoSOL' : 'BOND'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Value</p>
-                  <p className="font-medium">${asset.value.toLocaleString()}</p>
+                <div className="text-right">
+                  <div className="text-xl font-semibold text-white">${asset.value.toFixed(2)}</div>
+                  <div className="text-sm text-slate-400">Value</div>
                 </div>
               </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => navigate('/collateral/deposit')}
-                  className="btn btn-outline flex-1"
+              
+              {/* Oracle Data Display */}
+              {isOracleEnabled && oraclePrices[asset.id] && (
+                <div className="mt-3 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-slate-300">Oracle Price:</span>
+                    <span className="font-medium text-white">${oraclePrices[asset.id].price.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-sm text-slate-300">Source:</span>
+                    <span className="text-sm text-slate-300">{oraclePrices[asset.id].source}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Last Updated:</span>
+                    <span className="text-sm text-slate-300">
+                      {new Date(oraclePrices[asset.id].timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-300">Confidence:</span>
+                    <span className="text-sm text-slate-300">
+                      {(oraclePrices[asset.id].confidence * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {isLoadingOracle && !oraclePrices[asset.id] && (
+                <div className="mt-3 p-3 bg-slate-700/50 rounded-lg border border-slate-600 flex items-center justify-center">
+                  <div className="animate-pulse flex space-x-2 items-center">
+                    <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
+                    <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
+                    <div className="h-2 w-2 bg-blue-400 rounded-full"></div>
+                    <span className="text-sm text-slate-400">Loading oracle data...</span>
+                  </div>
+                </div>
+              )}
+              
+              {!isLoadingOracle && !oraclePrices[asset.id] && isOracleEnabled && (
+                <div className="mt-3 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
+                  <div className="text-sm text-amber-400 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Oracle data unavailable
+                  </div>
+                </div>
+              )}
+              
+              <div className="mt-4 flex space-x-2">
+                <button 
+                  onClick={() => navigate('/deposit')}
+                  className="flex-1 py-2 px-3 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
                 >
                   Deposit
                 </button>
-                <button
-                  onClick={() => navigate('/collateral/withdraw')}
-                  className="btn btn-outline flex-1"
+                <button 
+                  onClick={() => navigate('/withdraw')}
+                  className="flex-1 py-2 px-3 rounded-lg bg-slate-600 text-white text-sm font-medium hover:bg-slate-700 transition-colors"
                 >
                   Withdraw
                 </button>
               </div>
-              {isOracleEnabled && (
-                <div className="oracle-price mt-2 pt-2 border-t border-slate-700">
-                  {isLoadingOracle ? (
-                    <div className="flex items-center text-xs text-slate-400">
-                      <div className="h-3 w-3 mr-2 rounded-full border-2 border-slate-400 border-t-blue-400 animate-spin"></div>
-                      Loading oracle price...
-                    </div>
-                  ) : oraclePrices[asset.id] ? (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-400">Oracle Price:</span>
-                      <span className="text-sm font-medium text-blue-400">
-                        ${oraclePrices[asset.id].toFixed(2)}
-                        <span className="ml-1 text-xs text-slate-500">NCN Oracle</span>
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-400">Oracle price not available</div>
-                  )}
-                </div>
-              )}
             </div>
           ))}
         </div>
