@@ -532,7 +532,7 @@ export default function StakePage() {
                             Staking...
                           </span>
                         ) : (
-                          'Stake Now'
+                          'Re(Stake) Now'
                         )}
                       </button>
                       
