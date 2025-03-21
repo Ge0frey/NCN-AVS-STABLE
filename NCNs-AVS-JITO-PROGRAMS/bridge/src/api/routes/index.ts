@@ -8,6 +8,7 @@ const router = Router();
 
 // Feature status routes
 router.get('/features', (req, res) => featureController.getFeatureStatus(req, res));
+router.get('/features/test-jito', (req, res) => featureController.testJitoConnection(req, res));
 
 // Oracle routes
 router.get('/oracle/price/:assetId', (req, res) => oracleController.getAssetPrice(req, res));

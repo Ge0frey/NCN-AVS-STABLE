@@ -72,6 +72,19 @@ export async function getFeatureFlags() {
   }
 }
 
+/**
+ * Tests the connection to the Jito Restaking API
+ */
+export async function testJitoConnection() {
+  logDebug('Testing Jito connection');
+  try {
+    return await fetchAPI<{success: boolean; message: string; vaultsCount?: number}>('/features/test-jito');
+  } catch (error) {
+    console.error('Failed to test Jito connection:', error);
+    throw error;
+  }
+}
+
 // Oracle services
 export async function getAssetPrice(assetId: string) {
   try {
@@ -157,6 +170,7 @@ export async function executeProposal(proposalId: number, payloadImage: string) 
 
 export default {
   getFeatureFlags,
+  testJitoConnection,
   getAssetPrice,
   getOperators,
   getVaults,

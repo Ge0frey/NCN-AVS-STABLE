@@ -27,6 +27,7 @@ export interface RestakingVault {
   balance: number;
   delegatedAmount: number;
   apy: number;
+  acceptedTokens?: string[]; // Array of token symbols this vault accepts
 }
 
 export interface RestakingPosition {
