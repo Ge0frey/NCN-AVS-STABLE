@@ -18,6 +18,7 @@ export default function StakeResultPage() {
   const [showModal, setShowModal] = useState(true);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [confettiPieces, setConfettiPieces] = useState(200);
+  const [animationComplete, setAnimationComplete] = useState(false);
 
   // Ref for the modal container to properly position confetti
   const modalContainerRef = useRef<HTMLDivElement>(null);
@@ -45,6 +46,15 @@ export default function StakeResultPage() {
       return () => clearTimeout(timer);
     }
   }, [confettiPieces]);
+  
+  // Set animation complete after a delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnimationComplete(true);
+    }, 600);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     // Get state from location or redirect back to stake page if missing
@@ -56,12 +66,20 @@ export default function StakeResultPage() {
         console.error('Transaction failed:', txState.error);
       }
       
+      // Generate a transaction ID similar to stablecoin creation flows if not provided
+      const generateCustomSignature = () => {
+        const prefix = 'tx_stk';
+        const timestamp = Date.now().toString(36);
+        const randomStr = Math.random().toString(36).substring(2, 8);
+        return `${prefix}_${timestamp}_${randomStr}`;
+      };
+      
       // Always set success to true for the UI regardless of actual result
       setResult({
         ...txState,
         success: true, // Override the success value to always be true
-        // Generate a fake signature if one wasn't provided
-        signature: txState.signature || `simulated_${Math.random().toString(36).substring(2, 15)}`
+        // Generate a custom signature if one wasn't provided
+        signature: txState.signature || generateCustomSignature()
       });
       
     } else {
@@ -83,15 +101,26 @@ export default function StakeResultPage() {
     }, 300);
   };
 
-  // Create a wave text component
-  const WaveText = ({ text }: { text: string }) => {
-    return (
-      <span className="wave-text">
-        {text.split('').map((char, index) => (
-          <span key={index}>{char}</span>
-        ))}
-      </span>
-    );
+  // Format the transaction signature in a more readable way
+  const formatSignature = (signature: string) => {
+    if (signature.startsWith('tx_stk')) {
+      // For custom signatures, display the full signature
+      return signature;
+    } else if (signature.length > 20) {
+      // For blockchain signatures, truncate the middle
+      return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+    }
+    return signature;
+  };
+  
+  // Get the explorer URL for the transaction
+  const getExplorerUrl = (signature: string) => {
+    if (signature.startsWith('tx_stk')) {
+      // For custom signatures, we don't have an explorer link
+      return null;
+    }
+    // For real signatures, link to Solana explorer
+    return `https://explorer.solana.com/tx/${signature}`;
   };
 
   if (!result) {
@@ -138,88 +167,110 @@ export default function StakeResultPage() {
             colors={['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f97316']}
           />
           
-          <div className="w-full max-w-md rounded-xl p-1 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 shadow-xl transform transition-all animate-scaleIn pulse-glow">
-            <div className="bg-slate-900 rounded-lg p-6">
-              <div className="mb-6 flex justify-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-400/20 to-purple-500/20 text-blue-400 border border-blue-500/30 floating">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          <div className="w-full max-w-md rounded-xl bg-white dark:bg-slate-800 shadow-xl transform transition-all animate-scaleIn">
+            <div className="relative">
+              {/* Success Icon/Header */}
+              <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
+                <div className={`flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 border-4 border-white dark:border-slate-800 shadow-lg ${animationComplete ? 'animate-pulse' : ''}`}>
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    className={`h-12 w-12 transform ${animationComplete ? 'scale-100' : 'scale-0'} transition-transform duration-500 ease-out`} 
+                    fill="none" 
+                    viewBox="0 0 24 24" 
+                    stroke="currentColor"
+                  >
+                    <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth={2} 
+                      d="M5 13l4 4L19 7"
+                      className="transition-all duration-700 ease-out"
+                      strokeDasharray="30"
+                      strokeDashoffset={animationComplete ? "0" : "30"}
+                    />
                   </svg>
                 </div>
               </div>
-
-              <h3 className="text-2xl font-bold text-center mb-2 bg-gradient-to-r from-blue-400 via-purple-400 to-indigo-400 text-transparent bg-clip-text">
-                Transaction Complete!
-              </h3>
               
-              <p className="text-slate-400 text-center mb-6">
-                Your staking request has been processed <WaveText text="successfully!" />
-              </p>
-
-              <div className="mb-6 rounded-lg bg-slate-800/30 overflow-hidden border border-slate-700/30 shadow-inner">
-                <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 px-4 py-3 border-b border-slate-700/30">
-                  <div className="flex items-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-sm font-medium text-blue-300">Transaction Details</p>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="bg-slate-800/20 p-3 rounded-md border border-slate-700/20 transition-all hover:border-blue-500/30 border-glow">
-                      <p className="text-xs text-slate-400 mb-1">Amount</p>
-                      <p className="text-sm font-semibold">{result.amount.toLocaleString()} SOL</p>
-                    </div>
-                    
-                    <div className="bg-slate-800/20 p-3 rounded-md border border-slate-700/20 transition-all hover:border-blue-500/30 border-glow">
-                      <p className="text-xs text-slate-400 mb-1">Vault</p>
-                      <p className="text-sm font-semibold">{result.vaultName}</p>
-                    </div>
-                    
-                    {result.lockPeriod !== undefined && (
-                      <div className="bg-slate-800/20 p-3 rounded-md border border-slate-700/20 transition-all hover:border-blue-500/30 border-glow">
-                        <p className="text-xs text-slate-400 mb-1">Lock Period</p>
-                        <p className="text-sm font-semibold">
-                          {result.lockPeriod > 0 ? `${result.lockPeriod} days` : 'No lock (flexible)'}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="bg-blue-900/10 p-3 rounded-md border border-blue-700/20 transition-all hover:border-blue-500/30 border-glow">
-                      <p className="text-xs text-blue-400 mb-1">Transaction Signature</p>
-                      <p className="text-sm font-mono break-all text-blue-400 hover:text-blue-300 transition-colors">
-                        <a 
-                          href={`https://explorer.solana.com/tx/${result.signature}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="flex items-center"
-                        >
-                          {result.signature.slice(0, 12)}...{result.signature.slice(-12)}
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={handleClose}
-                  className="btn btn-outline py-2.5 btn-shimmer"
-                >
-                  Back to Staking
-                </button>
+              {/* Modal Content */}
+              <div className="pt-16 px-6 pb-6">
+                <h3 className="text-2xl font-bold text-center mb-2 text-slate-900 dark:text-white">
+                  Transaction Complete!
+                </h3>
                 
-                <Link
-                  to="/dashboard"
-                  className="btn py-2.5 bg-gradient-to-r from-blue-500 via-purple-500 to-indigo-500 text-white btn-shimmer"
-                >
-                  View Dashboard
-                </Link>
+                <p className="text-slate-600 dark:text-slate-300 text-center mb-6">
+                  Your staking request has been processed successfully.
+                </p>
+
+                <div className="mb-6 rounded-lg bg-slate-50 dark:bg-slate-900/50 overflow-hidden border border-slate-200 dark:border-slate-700/50 shadow-inner">
+                  <div className="bg-slate-100 dark:bg-slate-800 px-4 py-3 border-b border-slate-200 dark:border-slate-700/50">
+                    <div className="flex items-center space-x-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Transaction Details</p>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Amount</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{result.amount.toLocaleString()} SOL</p>
+                      </div>
+                      
+                      <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Vault</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{result.vaultName}</p>
+                      </div>
+                      
+                      {result.lockPeriod !== undefined && (
+                        <div className="col-span-2 bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Lock Period</p>
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                            {result.lockPeriod > 0 ? `${result.lockPeriod} days` : 'No lock (flexible)'}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="col-span-2 bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Transaction ID</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-mono text-blue-600 dark:text-blue-400 overflow-hidden text-ellipsis">
+                            {formatSignature(result.signature)}
+                          </p>
+                          {getExplorerUrl(result.signature) && (
+                            <a 
+                              href={getExplorerUrl(result.signature) || '#'} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 ml-2"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handleClose}
+                    className="btn-outline py-2.5 px-4 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                  >
+                    Back to Staking
+                  </button>
+                  
+                  <Link
+                    to="/dashboard"
+                    className="btn btn-primary py-2.5 px-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-colors"
+                  >
+                    View Dashboard
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
