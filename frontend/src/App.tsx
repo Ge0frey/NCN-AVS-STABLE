@@ -27,6 +27,7 @@ import WithdrawCollateralPage from './pages/WithdrawCollateralPage'
 import MintPage from './pages/MintPage'
 import RedeemPage from './pages/RedeemPage'
 import StakePage from './pages/StakePage'
+import StakeResultPage from './pages/StakeResultPage'
 import GovernancePage from './pages/GovernancePage'
 
 function App() {
@@ -98,6 +99,11 @@ function App() {
                   <Route path="/stake" element={
                     <ProtectedRoute>
                       <StakePage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/stake/result" element={
+                    <ProtectedRoute>
+                      <StakeResultPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/governance" element={

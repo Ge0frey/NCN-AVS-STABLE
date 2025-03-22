@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import api from '../services/api';
 
@@ -20,6 +21,8 @@ interface Position {
 }
 
 export default function StakePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { publicKey, connected, isJitoEnabled, setJitoEnabled, stakeToVault, unstakeFromVault } = useWalletContext();
   const [activeTab, setActiveTab] = useState<'jito' | 'regular'>('jito');
   const [vaults, setVaults] = useState<Vault[]>([]);
@@ -78,7 +81,32 @@ export default function StakePage() {
     loadData();
   }, [connected, publicKey, jitoConnectionTested, jitoConnectionSuccess]);
   
-  // Modified staking handler with more error details
+  // Refresh positions when returning from a successful transaction
+  useEffect(() => {
+    const refreshAfterTransaction = async () => {
+      // Check if we're coming back from the result page and if we need to refresh
+      const state = location.state as { refresh?: boolean } | null;
+      
+      if (state?.refresh && connected && publicKey) {
+        console.log("Refreshing positions after returning from transaction");
+        try {
+          setIsLoading(true);
+          const positionsData = await api.getUserPositions(publicKey.toString());
+          setPositions(positionsData);
+        } catch (err) {
+          console.error("Failed to refresh positions:", err);
+        } finally {
+          setIsLoading(false);
+          // Clear the location state to prevent unnecessary refreshes
+          navigate('.', { replace: true, state: {} });
+        }
+      }
+    };
+    
+    refreshAfterTransaction();
+  }, [location, navigate, connected, publicKey]);
+  
+  // Modified staking handler with more error details and navigation
   const handleStakeWithDebugging = async () => {
     if (!selectedVault || !stakeAmount) {
       setError('Please select a vault and enter an amount');
@@ -86,6 +114,7 @@ export default function StakePage() {
     }
     
     const amount = parseFloat(stakeAmount);
+    const selectedVaultData = vaults.find(v => v.address === selectedVault);
     
     setIsSubmitting(true);
     setError(null);
@@ -111,14 +140,19 @@ export default function StakePage() {
       const result = await stakeToVault(selectedVault, amount, lockPeriod);
       console.log("Stake result:", result);
       
-      setSuccess(`Successfully staked ${amount} SOL. Transaction signature: ${result.signature.slice(0, 8)}...`);
+      // Instead of setting success state, navigate to the result page
+      navigate('/stake/result', {
+        state: {
+          success: true,
+          amount: amount,
+          vaultName: selectedVaultData?.name || 'Unknown Vault',
+          signature: result.signature,
+          lockPeriod: lockPeriod
+        }
+      });
+      
       setStakeAmount('');
       
-      // Refresh positions after a successful transaction
-      if (publicKey) {
-        const positionsData = await api.getUserPositions(publicKey.toString());
-        setPositions(positionsData);
-      }
     } catch (err) {
       console.error("DETAILED ERROR:", err);
       
@@ -127,14 +161,22 @@ export default function StakePage() {
         console.error("Error stack:", err.stack);
       }
       
-      // Set a more detailed error message
-      setError('Failed to stake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      // Navigate to result page with error info
+      navigate('/stake/result', {
+        state: {
+          success: false,
+          amount: amount,
+          vaultName: selectedVaultData?.name || 'Unknown Vault',
+          lockPeriod: lockPeriod,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        }
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  // Handle staking
+  // Handle staking with navigation to result page
   const handleStake = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -162,6 +204,8 @@ export default function StakePage() {
       return;
     }
     
+    const selectedVaultData = vaults.find(v => v.address === selectedVault);
+    
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
@@ -171,25 +215,47 @@ export default function StakePage() {
       const result = await stakeToVault(selectedVault, amount, lockPeriod);
       
       if (result.success) {
-        setSuccess(`Successfully staked ${amount} SOL. Transaction signature: ${result.signature.slice(0, 8)}...`);
-        setStakeAmount('');
-        
-        // Refresh positions after a successful transaction
-          if (publicKey) {
-            const positionsData = await api.getUserPositions(publicKey.toString());
-            setPositions(positionsData);
+        // Navigate to result page instead of showing success message inline
+        navigate('/stake/result', {
+          state: {
+            success: true,
+            amount: amount,
+            vaultName: selectedVaultData?.name || 'Unknown Vault',
+            signature: result.signature,
+            lockPeriod: lockPeriod
           }
+        });
+        
+        setStakeAmount('');
       } else {
-        setError('Failed to stake: Transaction failed');
+        // Navigate to result page with error info
+        navigate('/stake/result', {
+          state: {
+            success: false,
+            amount: amount,
+            vaultName: selectedVaultData?.name || 'Unknown Vault',
+            lockPeriod: lockPeriod,
+            error: 'Transaction failed'
+          }
+        });
       }
     } catch (err) {
-      setError('Failed to stake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      // Navigate to result page with error info
+      navigate('/stake/result', {
+        state: {
+          success: false,
+          amount: amount,
+          vaultName: selectedVaultData?.name || 'Unknown Vault',
+          lockPeriod: lockPeriod,
+          error: err instanceof Error ? err.message : 'Unknown error'
+        }
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  // Handle unstaking
+  // Handle unstaking with navigation to result page
   const handleUnstake = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -218,20 +284,42 @@ export default function StakePage() {
       // Use the real blockchain interaction instead of simulation
       const result = await unstakeFromVault(position.vaultAddress, amount);
       
+      // Find the vault name
+      const vaultData = vaults.find(v => v.address === position.vaultAddress);
+      
       if (result.success) {
-        setSuccess(`Successfully unstaked ${amount} SOL. Transaction signature: ${result.signature.slice(0, 8)}...`);
-        setUnstakeAmount('');
-        
-        // Refresh positions after a successful transaction
-          if (publicKey) {
-            const positionsData = await api.getUserPositions(publicKey.toString());
-            setPositions(positionsData);
+        // Navigate to result page
+        navigate('/stake/result', {
+          state: {
+            success: true,
+            amount: amount,
+            vaultName: vaultData?.name || 'Unknown Vault',
+            signature: result.signature,
+            lockPeriod: 0, // Unstaking doesn't have a lock period
           }
+        });
+        setUnstakeAmount('');
       } else {
-        setError('Failed to unstake: Transaction failed');
+        // Navigate to result page with error info
+        navigate('/stake/result', {
+          state: {
+            success: false,
+            amount: amount,
+            vaultName: vaultData?.name || 'Unknown Vault',
+            error: 'Transaction failed'
+          }
+        });
       }
     } catch (err) {
-      setError('Failed to unstake: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      // Navigate to result page with error info
+      navigate('/stake/result', {
+        state: {
+          success: false,
+          amount: amount,
+          vaultName: vaults.find(v => v.address === position.vaultAddress)?.name || 'Unknown Vault',
+          error: err instanceof Error ? err.message : 'Unknown error'
+        }
+      });
     } finally {
       setIsSubmitting(false);
     }
