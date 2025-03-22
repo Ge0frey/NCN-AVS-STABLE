@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import api from '../services/api';
+import Confetti from 'react-confetti';
 
 // Mock data for demonstration
 const mockData = {
@@ -92,6 +93,8 @@ export default function GovernancePage() {
   const [proposalDescription, setProposalDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [confettiPieces, setConfettiPieces] = useState(200);
 
   // Add NCN state
   const [isNcnEnabled, setIsNcnEnabled] = useState<boolean>(false);
@@ -126,6 +129,30 @@ export default function GovernancePage() {
     
     checkNcnEnabled();
   }, []);
+
+  // Handle window resize for confetti
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Reduce confetti gradually
+  useEffect(() => {
+    if (showSuccessModal && confettiPieces > 0) {
+      const timer = setTimeout(() => {
+        setConfettiPieces(prevPieces => Math.max(0, prevPieces - 10));
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [confettiPieces, showSuccessModal]);
 
   // Format time remaining
   const formatTimeRemaining = (endTime: number) => {
@@ -544,11 +571,20 @@ export default function GovernancePage() {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="w-full max-w-lg rounded-lg bg-white p-6 text-center shadow-xl dark:bg-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4 animate-fadeIn">
+          {/* Confetti effect */}
+          <Confetti
+            width={windowSize.width}
+            height={windowSize.height}
+            numberOfPieces={confettiPieces}
+            recycle={false}
+            colors={['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f97316']}
+          />
+          
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 text-center shadow-xl dark:bg-slate-800 transform transition-all animate-scaleIn">
             <div className="mb-4 text-green-500">
               <svg
-                className="mx-auto h-12 w-12"
+                className="mx-auto h-12 w-12 animate-pulse"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

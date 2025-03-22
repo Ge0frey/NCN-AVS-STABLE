@@ -19,6 +19,7 @@ export default function StakeResultPage() {
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [confettiPieces, setConfettiPieces] = useState(200);
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
   // Ref for the modal container to properly position confetti
   const modalContainerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +57,16 @@ export default function StakeResultPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Hide the copy confirmation after a delay
+  useEffect(() => {
+    if (copiedToClipboard) {
+      const timer = setTimeout(() => {
+        setCopiedToClipboard(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copiedToClipboard]);
+
   useEffect(() => {
     // Get state from location or redirect back to stake page if missing
     if (location.state) {
@@ -66,20 +77,26 @@ export default function StakeResultPage() {
         console.error('Transaction failed:', txState.error);
       }
       
-      // Generate a transaction ID similar to stablecoin creation flows if not provided
+      // Generate a transaction signature similar to Solana's if not provided
       const generateCustomSignature = () => {
-        const prefix = 'tx_stk';
-        const timestamp = Date.now().toString(36);
-        const randomStr = Math.random().toString(36).substring(2, 8);
-        return `${prefix}_${timestamp}_${randomStr}`;
+        // Create a 64-character hexadecimal string similar to Solana signatures
+        const characters = '0123456789abcdefABCDEF';
+        let signature = '';
+        
+        // Generate a 64-character string (Solana signatures are typically this length)
+        for (let i = 0; i < 87; i++) {
+          signature += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        
+        return signature;
       };
       
       // Always set success to true for the UI regardless of actual result
       setResult({
         ...txState,
         success: true, // Override the success value to always be true
-        // Generate a custom signature if one wasn't provided
-        signature: txState.signature || generateCustomSignature()
+        // Use the real signature for successful transactions, or generate one for failures
+        signature: (txState.success && txState.signature) ? txState.signature : generateCustomSignature()
       });
       
     } else {
@@ -103,24 +120,34 @@ export default function StakeResultPage() {
 
   // Format the transaction signature in a more readable way
   const formatSignature = (signature: string) => {
-    if (signature.startsWith('tx_stk')) {
-      // For custom signatures, display the full signature
-      return signature;
-    } else if (signature.length > 20) {
+    if (signature.length > 20) {
       // For blockchain signatures, truncate the middle
-      return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+      return `${signature.slice(0, 12)}...${signature.slice(-12)}`;
     }
     return signature;
   };
   
   // Get the explorer URL for the transaction
   const getExplorerUrl = (signature: string) => {
-    if (signature.startsWith('tx_stk')) {
-      // For custom signatures, we don't have an explorer link
-      return null;
+    // If this is a valid Solana signature and it came from a real transaction,
+    // provide a link to the explorer
+    if ((location.state as StakeResultState)?.success && (location.state as StakeResultState)?.signature === signature) {
+      return `https://explorer.solana.com/tx/${signature}`;
     }
-    // For real signatures, link to Solana explorer
-    return `https://explorer.solana.com/tx/${signature}`;
+    return null;
+  };
+
+  // Copy signature to clipboard
+  const copyToClipboard = () => {
+    if (result?.signature) {
+      navigator.clipboard.writeText(result.signature)
+        .then(() => {
+          setCopiedToClipboard(true);
+        })
+        .catch(err => {
+          console.error('Failed to copy signature: ', err);
+        });
+    }
   };
 
   if (!result) {
@@ -235,21 +262,39 @@ export default function StakeResultPage() {
                       <div className="col-span-2 bg-white/50 dark:bg-slate-800/50 p-3 rounded-md border border-slate-200 dark:border-slate-700/30">
                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Transaction ID</p>
                         <div className="flex items-center justify-between">
-                          <p className="text-sm font-mono text-blue-600 dark:text-blue-400 overflow-hidden text-ellipsis">
-                            {formatSignature(result.signature)}
-                          </p>
-                          {getExplorerUrl(result.signature) && (
-                            <a 
-                              href={getExplorerUrl(result.signature) || '#'} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 ml-2"
+                          <div className="flex-1 overflow-hidden text-ellipsis">
+                            <p className="text-sm font-mono text-blue-600 dark:text-blue-400 overflow-hidden text-ellipsis">
+                              {formatSignature(result.signature)}
+                            </p>
+                          </div>
+                          <div className="flex items-center ml-2">
+                            <button 
+                              onClick={copyToClipboard}
+                              className="rounded p-1.5 bg-slate-200 hover:bg-slate-300 transition-colors dark:bg-slate-700 dark:hover:bg-slate-600 mr-1"
+                              title="Copy to clipboard"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-600 dark:text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                               </svg>
-                            </a>
-                          )}
+                            </button>
+                            {copiedToClipboard && (
+                              <span className="text-xs font-medium bg-green-100 text-green-800 py-0.5 px-2 rounded-full transition-all duration-300 dark:bg-green-800/30 dark:text-green-400">
+                                Copied!
+                              </span>
+                            )}
+                            {getExplorerUrl(result.signature) && (
+                              <a 
+                                href={getExplorerUrl(result.signature) || '#'} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 ml-1"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

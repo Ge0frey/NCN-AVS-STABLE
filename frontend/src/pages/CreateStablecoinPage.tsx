@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStableFunds } from '../hooks/useStableFunds';
 import { PublicKey } from '@solana/web3.js';
@@ -6,6 +6,8 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 import { logger } from '../services/logger';
 import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl, isValidTransactionSignature } from '../utils/transaction';
+import { toast } from 'react-toastify';
+import Confetti from 'react-confetti';
 
 // Add animation styles to the document
 if (typeof document !== 'undefined') {
@@ -85,6 +87,8 @@ export default function CreateStablecoinPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [confettiPieces, setConfettiPieces] = useState(200);
   
   // Add these hooks
   const { connected } = useWallet();
@@ -824,6 +828,30 @@ export default function CreateStablecoinPage() {
     }
   };
 
+  // Handle window resize for confetti
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Reduce confetti gradually
+  useEffect(() => {
+    if (showSuccessModal && confettiPieces > 0) {
+      const timer = setTimeout(() => {
+        setConfettiPieces(prevPieces => Math.max(0, prevPieces - 10));
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [confettiPieces, showSuccessModal]);
+
   // Success Modal
   const renderSuccessModal = () => {
     if (!showSuccessModal) return null;
@@ -866,6 +894,15 @@ export default function CreateStablecoinPage() {
     
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fadeIn">
+        {/* Confetti effect */}
+        <Confetti
+          width={windowSize.width}
+          height={windowSize.height}
+          numberOfPieces={confettiPieces}
+          recycle={false}
+          colors={['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f97316']}
+        />
+        
         <div className="w-full max-w-lg rounded-xl bg-white/95 p-6 shadow-2xl dark:bg-slate-800/95 dark:shadow-blue-900/20 border border-slate-200/20 dark:border-slate-700/30 transform transition-all duration-300 animate-scaleIn">
           {/* Success Icon */}
           <div className="flex justify-center mb-6">

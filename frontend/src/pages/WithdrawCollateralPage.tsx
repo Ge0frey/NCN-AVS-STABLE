@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import { useStableFunds } from '../hooks/useStableFunds';
+import Confetti from 'react-confetti';
 
 export default function WithdrawCollateralPage() {
   const navigate = useNavigate();
@@ -55,6 +56,8 @@ export default function WithdrawCollateralPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [newCollateralRatio, setNewCollateralRatio] = useState(averageCollateralRatio);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
+  const [confettiPieces, setConfettiPieces] = useState(200);
 
   // Get selected asset details
   const assetDetails = collateralAssets.find(asset => asset.id === selectedAsset);
@@ -96,6 +99,30 @@ export default function WithdrawCollateralPage() {
     const newRatio = (newTotalCollateral / stablecoinValue) * 100;
     setNewCollateralRatio(Math.max(0, newRatio));
   }, [selectedAsset, amount, totalCollateralValue, averageCollateralRatio]);
+
+  // Handle window resize for confetti
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  // Reduce confetti gradually
+  useEffect(() => {
+    if (showSuccessModal && confettiPieces > 0) {
+      const timer = setTimeout(() => {
+        setConfettiPieces(prevPieces => Math.max(0, prevPieces - 10));
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [confettiPieces, showSuccessModal]);
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -166,9 +193,18 @@ export default function WithdrawCollateralPage() {
     if (!showSuccessModal) return null;
     
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-fadeIn">
+        {/* Confetti effect */}
+        <Confetti
+          width={windowSize.width}
+          height={windowSize.height}
+          numberOfPieces={confettiPieces}
+          recycle={false}
+          colors={['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f97316']}
+        />
+        
+        <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800 transform transition-all animate-scaleIn">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400 animate-pulse">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
