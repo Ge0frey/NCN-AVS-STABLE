@@ -1,54 +1,103 @@
-# React + TypeScript + Vite
+# STABLE-FUNDS Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the frontend application for STABLE-FUNDS, a Solana-based platform for creating and managing stablecoins, handling collateral, and participating in Jito restaking.
 
-Currently, two official plugins are available:
+## Technology Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Framework**: React 19 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: TailwindCSS 4.x with custom styling
+- **Blockchain**: Solana Web3.js and Wallet Adapter
+- **Routing**: React Router DOM 7.x
 
-## Expanding the ESLint configuration
+## Key Components
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Core Architecture
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+- **Context-based State Management**:
+  - `WalletContext`: Manages Solana wallet connections, balances, and blockchain interactions
+  - `ThemeContext`: Provides application-wide dark/light theme switching
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **Protected Routes**: Authentication system that redirects unauthenticated users and shows loading states during async operations
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+- **Responsive Layout System**:
+  - `Layout`: Main layout wrapper with responsive sidebar
+  - `Header`: Navigation and wallet connection UI
+  - `Sidebar`: Main application navigation with collapsible menu
+  - Glass panels and background effects for modern UI
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+### Features
+
+- **Wallet Integration**:
+  - Multiple wallet support (Phantom, Solflare, Ledger)
+  - Wallet connection management
+  - Balance display and transaction signing
+
+- **Stablecoin Management**:
+  - Stablecoin creation with custom parameters
+  - Viewing and managing existing stablecoins
+  - Market data visualization
+
+- **Collateral Management**:
+  - Deposit and withdraw collateral
+  - Collateral ratio monitoring
+  - Oracle price integration
+
+- **Jito Restaking**:
+  - Stake/unstake functionality
+  - Restaking analytics
+  - Vault management
+
+- **Governance**:
+  - Proposal viewing and voting
+
+### Custom Hooks
+
+- `useStableFunds`: Core hook for interacting with the STABLE-FUNDS protocol
+- `useWalletContext`: Simplified wallet interaction hook
+
+### Styling
+
+- Futuristic UI with glassmorphism effects
+- Responsive design with mobile-first approach
+- Custom animations and transitions
+- Dark/Light theme support
+
+## Environment Setup
+
+The application supports multiple environments:
+
+- **Development**: Uses simulation and mock data options for easier testing
+- **Production**: Connects to real Solana networks and disables simulation
+
+## Getting Started
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Build for production:
+   ```bash
+   npm run build
+   ```
+
+## Environment Variables
+
+- `REACT_APP_SIMULATE_SUCCESS`: Enable/disable transaction simulation
+- `REACT_APP_SOLANA_CLUSTER`: Set Solana cluster (devnet/mainnet)
+- `REACT_APP_LOG_ENDPOINT`: Server endpoint for logging
+
+## Project Structure
+
+- `/src/components`: Reusable UI components
+- `/src/context`: Application-wide state providers
+- `/src/hooks`: Custom React hooks
+- `/src/pages`: Page components for each route
+- `/src/services`: Service modules for external interactions
+- `/src/idl`: Anchor program interfaces
