@@ -239,149 +239,137 @@ const SmartVaults: React.FC = () => {
   }, [totalDeposited]);
   
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
-      <h2 className="text-3xl font-bold text-white mb-6">Smart Vaults</h2>
-      <p className="text-gray-300 mb-8">
-        Maximize your collateral's earning potential with automated yield strategies while maintaining the security of your stablecoin positions.
-      </p>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div className="bg-gray-800 p-6 rounded-lg col-span-2">
-          <h3 className="text-xl font-semibold text-white mb-4">Strategy Allocation</h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1">
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={chartData}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      labelLine={false}
-                    >
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => `${value}%`} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[200px] flex items-center justify-center text-gray-400">
-                  No allocations set
-                </div>
-              )}
-            </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="glass-panel rounded-xl p-6 mb-6">
+        <h2 className="text-3xl font-bold text-white mb-4">Smart Vaults</h2>
+        <p className="text-slate-300 mb-6">
+          Maximize your collateral's earning potential with automated yield strategies while maintaining the security of your stablecoin positions.
+        </p>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="glass-card rounded-lg col-span-2 p-6">
+            <h3 className="text-xl font-semibold text-blue-400 mb-4">Strategy Allocation</h3>
             
-            <div className="lg:col-span-2">
-              <div className="space-y-4">
-                {STRATEGY_OPTIONS.map(strategy => (
-                  <div 
-                    key={strategy.id} 
-                    className="bg-gray-700 rounded-lg p-4 cursor-pointer"
-                    onClick={() => toggleStrategy(strategy.id)}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: strategy.color }}></div>
-                        <span className="font-medium text-white">{strategy.name}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={allocations.find(a => a.id === strategy.id)?.percentage || 0}
-                          onChange={(e) => handleAllocationChange(strategy.id, parseInt(e.target.value) || 0)}
-                          className="w-16 bg-gray-600 text-white rounded px-2 py-1 text-center"
+            {/* Pie chart and allocation sliders */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                {chartData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number) => [`${value}%`, 'Allocation']}
+                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#e2e8f0' }}
                         />
-                        <span className="text-gray-300">%</span>
-                      </div>
-                    </div>
-                    
-                    {expandedStrategy === strategy.id && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="mt-3 pt-3 border-t border-gray-600"
-                      >
-                        <div className="text-gray-300 text-sm">{strategy.description}</div>
-                        <div className="mt-2 flex justify-between">
-                          <div>
-                            <span className="text-gray-400 text-xs">Expected APY:</span>
-                            <span className="text-green-400 ml-1">{strategy.apy}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-400 text-xs">Risk Level:</span>
-                            <span className="text-yellow-400 ml-1">{strategy.risk}</span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                ))}
+                ) : (
+                  <div className="h-64 flex items-center justify-center">
+                    <p className="text-gray-400">No allocations set</p>
+                  </div>
+                )}
               </div>
               
-              <div className="mt-4 flex justify-between items-center">
-                <div className="flex items-center">
+              <div>
+                <div className="space-y-4">
+                  {STRATEGY_OPTIONS.map((strategy) => {
+                    const allocation = allocations.find(a => a.id === strategy.id) || { percentage: 0 };
+                    return (
+                      <div key={strategy.id} className="space-y-1">
+                        <div className="flex justify-between">
+                          <label className="text-slate-300 flex items-center">
+                            <span className="h-3 w-3 inline-block mr-2 rounded-full" style={{ backgroundColor: strategy.color }}></span>
+                            {strategy.name}
+                          </label>
+                          <span className="text-slate-300">{allocation.percentage}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={allocation.percentage}
+                          onChange={(e) => handleAllocationChange(strategy.id, parseInt(e.target.value))}
+                          className="w-full accent-blue-500"
+                        />
+                        <div className="flex justify-between text-xs text-slate-400">
+                          <span>APY: {strategy.apy}</span>
+                          <span>Risk: {strategy.risk}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {totalAllocation !== 100 && (
+                    <div className="text-amber-400 text-sm mt-2">
+                      Total allocation: {totalAllocation}% (must equal 100%)
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={handleUpdateAllocations}
+                    disabled={isLoading || !connected || totalAllocation !== 100}
+                    className="w-full px-4 py-2 mt-2 gradient-button rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? 'Updating...' : 'Update Allocation'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="glass-card rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-blue-400 mb-4">Smart Vault Overview</h3>
+            
+            <div className="space-y-6">
+              <div>
+                <p className="text-slate-400 text-sm">Total Deposited</p>
+                <p className="text-2xl font-bold text-white">{formatCurrency(totalDeposited)} SOL</p>
+              </div>
+              
+              <div>
+                <p className="text-slate-400 text-sm">Projected Annual Yield</p>
+                <p className="text-2xl font-bold text-green-400">{formatCurrency(projectedYield)} SOL</p>
+                <p className="text-xs text-slate-400">Based on current allocations</p>
+              </div>
+              
+              <div className="border-t border-slate-700 pt-4">
+                <div className="flex items-center mb-2">
                   <input
                     type="checkbox"
                     id="autoCompound"
                     checked={isAutoCompound}
-                    onChange={() => setIsAutoCompound(!isAutoCompound)}
-                    className="mr-2"
+                    onChange={(e) => setIsAutoCompound(e.target.checked)}
+                    className="mr-2 accent-blue-500"
                   />
-                  <label htmlFor="autoCompound" className="text-gray-300">Auto-compound yields</label>
+                  <label htmlFor="autoCompound" className="text-slate-300 text-sm font-medium">Auto-compound Rewards</label>
                 </div>
-                
-                <button
-                  onClick={handleUpdateAllocations}
-                  disabled={isLoading || totalAllocation !== 100}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
-                >
-                  {isLoading ? 'Updating...' : 'Update Allocation'}
-                </button>
+                <p className="text-xs text-slate-400">Automatically reinvest your yield to maximize returns</p>
               </div>
-              
-              {totalAllocation !== 100 && (
-                <p className="text-red-400 text-sm mt-2">
-                  Total allocation must be 100% (current: {totalAllocation}%)
-                </p>
-              )}
             </div>
           </div>
         </div>
         
-        <div className="bg-gray-800 p-6 rounded-lg">
-          <h3 className="text-xl font-semibold text-white mb-4">Vault Summary</h3>
-          
-          <div className="space-y-4">
-            <div>
-              <p className="text-gray-400 text-sm">Total Deposited</p>
-              <p className="text-2xl font-bold text-white">{formatCurrency(totalDeposited)} SOL</p>
-            </div>
-            
-            <div>
-              <p className="text-gray-400 text-sm">Projected Annual Yield</p>
-              <p className="text-2xl font-bold text-green-400">
-                {formatCurrency(projectedYield)} SOL
-                <span className="text-sm text-gray-400 ml-2">
-                  ({((projectedYield / totalDeposited) * 100).toFixed(2)}%)
-                </span>
-              </p>
-            </div>
-            
-            <div className="pt-4 border-t border-gray-700">
-              <div className="flex flex-col space-y-2 mb-4">
-                <label className="text-gray-300 text-sm">Deposit SOL</label>
-                <div className="flex space-x-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <div className="glass-card rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-blue-400 mb-4">Deposit</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-slate-300 mb-2">Amount (SOL)</label>
+                <div className="relative">
                   <input
                     type="number"
                     min="0"
@@ -389,71 +377,85 @@ const SmartVaults: React.FC = () => {
                     value={depositAmount}
                     onChange={(e) => setDepositAmount(e.target.value)}
                     placeholder="0.00"
-                    className="flex-1 bg-gray-700 text-white rounded px-3 py-2"
+                    className="w-full bg-slate-800/70 text-white rounded px-3 py-2 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                  <button
-                    onClick={handleDeposit}
-                    disabled={isLoading || !depositAmount}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
-                  >
-                    {isLoading ? 'Processing...' : 'Deposit'}
-                  </button>
+                  <button className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded">MAX</button>
                 </div>
               </div>
               
-              <div className="flex flex-col space-y-2">
-                <label className="text-gray-300 text-sm">Withdraw SOL</label>
-                <div className="flex space-x-2">
+              <button
+                onClick={handleDeposit}
+                disabled={isLoading || !depositAmount || !connected}
+                className="w-full px-4 py-2 gradient-button rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Processing...' : 'Deposit'}
+              </button>
+            </div>
+          </div>
+          
+          <div className="glass-card rounded-lg p-6">
+            <h3 className="text-xl font-semibold text-blue-400 mb-4">Withdraw</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-slate-300 mb-2">Amount (SOL)</label>
+                <div className="relative">
                   <input
                     type="number"
                     min="0"
-                    max={totalDeposited}
                     step="0.01"
+                    max={totalDeposited}
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
                     placeholder="0.00"
-                    className="flex-1 bg-gray-700 text-white rounded px-3 py-2"
+                    className="w-full bg-slate-800/70 text-white rounded px-3 py-2 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
-                  <button
-                    onClick={handleWithdraw}
-                    disabled={isLoading || !withdrawAmount}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition"
-                  >
-                    {isLoading ? 'Processing...' : 'Withdraw'}
-                  </button>
+                  <button className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded">MAX</button>
                 </div>
               </div>
+              
+              <button
+                onClick={handleWithdraw}
+                disabled={isLoading || !withdrawAmount || !connected || parseFloat(withdrawAmount) > totalDeposited}
+                className="w-full px-4 py-2 gradient-button rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Processing...' : 'Withdraw'}
+              </button>
             </div>
           </div>
         </div>
-      </div>
-      
-      <div className="bg-blue-900/30 p-6 rounded-lg border border-blue-800">
-        <h3 className="text-xl font-semibold text-white mb-2">How Smart Vaults Work</h3>
-        <p className="text-gray-300 mb-4">
-          Smart Vaults automatically deploy your idle collateral into various yield-generating strategies while ensuring it remains available to secure your stablecoin positions.
-        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-800/60 p-4 rounded-lg">
-            <h4 className="text-blue-400 font-medium mb-2">1. Deposit Collateral</h4>
-            <p className="text-gray-400 text-sm">
-              Deposit your assets into Smart Vaults to start earning yield while maintaining your collateral position.
-            </p>
-          </div>
+        <div className="glass-card rounded-lg p-6">
+          <h3 className="text-xl font-semibold text-blue-400 mb-4">Strategy Details</h3>
           
-          <div className="bg-gray-800/60 p-4 rounded-lg">
-            <h4 className="text-blue-400 font-medium mb-2">2. Customize Strategies</h4>
-            <p className="text-gray-400 text-sm">
-              Allocate your assets across multiple yield strategies based on your risk tolerance and reward expectations.
-            </p>
-          </div>
-          
-          <div className="bg-gray-800/60 p-4 rounded-lg">
-            <h4 className="text-blue-400 font-medium mb-2">3. Maximize Returns</h4>
-            <p className="text-gray-400 text-sm">
-              Earn yield on your collateral while it secures your stablecoin positions, improving capital efficiency.
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {STRATEGY_OPTIONS.map((strategy) => (
+              <div
+                key={strategy.id}
+                className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden transition-transform cursor-pointer hover:scale-102 hover:shadow-glow"
+                onClick={() => toggleStrategy(strategy.id)}
+              >
+                <div className="h-2" style={{ backgroundColor: strategy.color }}></div>
+                <div className="p-4">
+                  <h4 className="text-white font-medium mb-1">{strategy.name}</h4>
+                  <p className="text-slate-400 text-sm mb-2">{strategy.description}</p>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-400">APY: {strategy.apy}</span>
+                    <span className="text-slate-300">Risk: {strategy.risk}</span>
+                  </div>
+                  
+                  {expandedStrategy === strategy.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-3 pt-3 border-t border-slate-700 text-xs text-slate-300"
+                    >
+                      <p>Strategy details and explanation would go here. This would include how the strategy works, what protocols it interacts with, and any potential risks.</p>
+                    </motion.div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

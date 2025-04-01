@@ -81,18 +81,17 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
       </svg>
     )},
-    {
-      icon: <i className="fas fa-bolt text-lg"></i>,
-      label: 'Smart Vaults',
-      path: '/smart-vaults',
-      requiresAuth: true
-    },
-    {
-      icon: <i className="fas fa-shield-alt text-lg"></i>,
-      label: 'Liquidation Protection',
-      path: '/liquidation-protection',
-      requiresAuth: true
-    },
+    { path: '/smart-vaults', label: 'Smart Vaults', requiresAuth: true, icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+        <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+      </svg>
+    )},
+    { path: '/liquidation-protection', label: 'Liquidation Protection', requiresAuth: true, icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+      </svg>
+    )},
   ];
 
   // Check if a route is active (including nested routes)
