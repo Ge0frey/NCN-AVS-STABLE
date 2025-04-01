@@ -14,7 +14,36 @@ STABLE-FUNDS is a decentralized finance (DeFi) platform built on Sonic that enab
 - **Governance**: Vote on proposals and protocol parameters
 - **Decentralized Oracle Network**: Price feeds provided by Node Consensus Network (NCN)
 - **Restaking Integration**: Enhanced yields through Jito Restaking mechanism
+- **Smart Vaults**: Optimize yield on collateral with automated strategies while maintaining overcollateralization
+- **Liquidation Protection System**: Proactively protect positions from liquidation with automated monitoring and intervention
 - **Responsive UI**: Modern interface that works across desktop and mobile devices
+
+## NEW FEATURES (Added for Sonic Mobius Hackathon)
+
+### 1. Smart Vaults - Automated Yield Strategies for Collateral
+
+Smart Vaults automatically deploy idle collateral into yield-generating strategies while maintaining the security of overcollateralized stablecoins. This solves a critical capital efficiency problem in DeFi - idle collateral not generating returns.
+
+Key capabilities:
+- Customizable risk profiles for yield allocation
+- Multiple strategy options from low-risk (4-6% APY) to high-yield (20-30% APY)
+- Real-time yield tracking and projections
+- Auto-compounding option for maximum returns
+- Strategy rebalancing based on market conditions
+- Maintains collateral security with instant withdrawal capability
+
+### 2. Liquidation Protection System
+
+An innovative solution that monitors collateral health ratios and proactively protects positions from liquidation through automated intervention. This system leverages Sonic's high-performance infrastructure to provide peace of mind to stablecoin issuers.
+
+Key capabilities:
+- Real-time health ratio monitoring with configurable thresholds
+- Multiple protection modes: auto-repay, add collateral, or both
+- Historical health ratio tracking and visualization
+- Detailed protection action history
+- Customizable protection parameters (max protection amount, cooldown period)
+- Manual protection option for user control
+- Notification-only mode for users who prefer manual intervention
 
 ## Architecture
 

@@ -100,6 +100,30 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
                   Governance
                 </Link>
               </li>
+              <li>
+                <Link 
+                  to="/smart-vaults" 
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    location.pathname === '/smart-vaults' 
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
+                  }`}
+                >
+                  Smart Vaults
+                </Link>
+              </li>
+              <li>
+                <Link 
+                  to="/liquidation-protection" 
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${
+                    location.pathname === '/liquidation-protection' 
+                      ? 'gradient-text' 
+                      : 'text-slate-300 hover:text-blue-400'
+                  }`}
+                >
+                  Liquidation Protection
+                </Link>
+              </li>
             </ul>
           </nav>
         )}

@@ -5,6 +5,9 @@ use std::mem::size_of;
 
 declare_id!("97XJBATGaXqBSVRQYszL7pr4RP46Uv9KH6FzcLx3zgd8");
 
+pub mod smart_vaults;
+pub mod liquidation_protection;
+
 #[program]
 pub mod stablefunds_program {
     use super::*;
@@ -103,6 +106,40 @@ pub mod stablefunds_program {
 
         msg!("Stablecoin minted: {}", amount);
         Ok(())
+    }
+
+    // Smart Vaults functions
+    pub fn initialize_smart_vault(ctx: Context<InitializeSmartVault>, vault_params: SmartVaultParams) -> Result<()> {
+        smart_vaults::initialize_smart_vault(ctx, vault_params)
+    }
+
+    pub fn deposit_to_strategy(ctx: Context<DepositToStrategy>, amount: u64) -> Result<()> {
+        smart_vaults::deposit_to_strategy(ctx, amount)
+    }
+
+    pub fn withdraw_from_strategy(ctx: Context<WithdrawFromStrategy>, amount: u64) -> Result<()> {
+        smart_vaults::withdraw_from_strategy(ctx, amount)
+    }
+
+    pub fn update_strategy_allocation(ctx: Context<UpdateStrategyAllocation>, allocations: Vec<StrategyAllocation>) -> Result<()> {
+        smart_vaults::update_strategy_allocation(ctx, allocations)
+    }
+
+    // Liquidation Protection System functions
+    pub fn configure_protection(ctx: Context<ConfigureProtection>, config: ProtectionConfig) -> Result<()> {
+        liquidation_protection::configure_protection(ctx, config)
+    }
+
+    pub fn activate_protection(ctx: Context<ActivateProtection>) -> Result<()> {
+        liquidation_protection::activate_protection(ctx)
+    }
+
+    pub fn deactivate_protection(ctx: Context<DeactivateProtection>) -> Result<()> {
+        liquidation_protection::deactivate_protection(ctx)
+    }
+
+    pub fn execute_protection_action(ctx: Context<ExecuteProtectionAction>, action_type: u8) -> Result<()> {
+        liquidation_protection::execute_protection_action(ctx, action_type)
     }
 }
 
