@@ -17,7 +17,7 @@ interface EnvConfig {
 
 // Default configuration values
 const defaultConfig: EnvConfig = {
-  PORT: 3001,
+  PORT: 3002,
   SOLANA_RPC_URL: 'https://api.testnet.sonic.game',
   SOLANA_WS_URL: 'wss://api.testnet.sonic.game',
   CAMBRIAN_AVS_HTTP_URL: 'http://localhost:3000',
