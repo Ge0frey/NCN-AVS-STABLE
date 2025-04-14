@@ -66,7 +66,7 @@ On-chain programs that handle the core logic of the platform, including stableco
 - **Framework**: Anchor 0.31.0
 - **Language**: Rust
 - **Testing**: TypeScript-based tests
-- **Deployment-cluster**: https://api.testnet.sonic.game
+- **Deployment-cluster**: https://api.devnet.solana.com reproducible on mainnet
 
 
 ### 3. NCN and AVS Integration

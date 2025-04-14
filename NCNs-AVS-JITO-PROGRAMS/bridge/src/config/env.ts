@@ -18,8 +18,8 @@ interface EnvConfig {
 // Default configuration values
 const defaultConfig: EnvConfig = {
   PORT: 3002,
-  SOLANA_RPC_URL: 'https://api.testnet.sonic.game',
-  SOLANA_WS_URL: 'wss://api.testnet.sonic.game',
+  SOLANA_RPC_URL: 'https://api.devnet.solana.com',
+  SOLANA_WS_URL: 'wss://api.devnet.solana.com',
   CAMBRIAN_AVS_HTTP_URL: 'http://localhost:3000',
   CAMBRIAN_AVS_WS_URL: 'ws://localhost:3000/ws',
   LOG_LEVEL: 'info',
