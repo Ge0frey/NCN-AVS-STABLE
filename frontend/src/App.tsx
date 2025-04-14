@@ -8,7 +8,7 @@ import { AppContextProvider } from './context/AppContext'
 import { Toaster } from 'react-hot-toast'
 import { CivicAuthProvider } from '@civic/auth-web3/react'
 import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
-import { PhantomWalletAdapter, SolflareWalletAdapter, LedgerWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { SolflareWalletAdapter, LedgerWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import { clusterApiUrl } from '@solana/web3.js'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
@@ -38,9 +38,11 @@ function App() {
   // Set up network and wallet configuration
   const network = WalletAdapterNetwork.Devnet;
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  
+  // IMPORTANT: Removed PhantomWalletAdapter as it's auto-registered by Civic Auth
   const wallets = useMemo(
     () => [
-      new PhantomWalletAdapter(),
+      // No PhantomWalletAdapter - Civic Auth registers it automatically
       new SolflareWalletAdapter(),
       new LedgerWalletAdapter()
     ],
@@ -50,12 +52,34 @@ function App() {
   // Get the Civic Auth client ID from environment variables
   const civicClientId = import.meta.env.VITE_CIVIC_CLIENT_ID;
 
+  // Define callbacks for Civic Auth
+  const handleSignIn = (error?: Error) => {
+    if (error) {
+      console.error('Civic Auth sign-in error:', error);
+    } else {
+      console.log('Civic Auth sign-in successful');
+    }
+  };
+
+  const handleSignOut = () => {
+    console.log('Civic Auth sign-out successful');
+  };
+
   return (
     <ErrorBoundary>
+      {/* First, establish the Solana connection */}
       <ConnectionProvider endpoint={endpoint}>
-        <SolanaWalletProvider wallets={wallets} autoConnect>
-          <WalletModalProvider>
-            <CivicAuthProvider clientId={civicClientId}>
+        {/* Next, wrap with CivicAuthProvider, which needs the connection */}
+        <CivicAuthProvider 
+          clientId={civicClientId}
+          onSignIn={handleSignIn}
+          onSignOut={handleSignOut}
+          displayMode="redirect"
+          redirectUrl={window.location.origin + "/connect"}
+        >
+          {/* Then add the Solana wallet providers, which will work with Civic's embedded wallet */}
+          <SolanaWalletProvider wallets={wallets} autoConnect>
+            <WalletModalProvider>
               <ThemeProvider>
                 <WalletProvider>
                   <AppContextProvider>
@@ -143,9 +167,9 @@ function App() {
                   </AppContextProvider>
                 </WalletProvider>
               </ThemeProvider>
-            </CivicAuthProvider>
-          </WalletModalProvider>
-        </SolanaWalletProvider>
+            </WalletModalProvider>
+          </SolanaWalletProvider>
+        </CivicAuthProvider>
       </ConnectionProvider>
     </ErrorBoundary>
   )

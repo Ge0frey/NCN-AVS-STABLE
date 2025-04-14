@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
-import { useUser } from '@civic/auth-web3/react';
-import { UserButton } from '@civic/auth-web3/react';
+import { SignInButton, useUser } from '@civic/auth-web3/react';
 
 export default function ConnectPage() {
   const { connected, connecting, connect, select, wallets } = useWalletContext();
-  const { user, isLoading: civicLoading, signIn: civicLogin } = useUser();
+  const { user, isLoading: civicLoading } = useUser();
   const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -23,12 +22,6 @@ export default function ConnectPage() {
     try {
       setError(null);
       setSelectedWallet(walletName);
-      
-      // Special handling for Civic Auth
-      if (walletName === 'Civic') {
-        await handleCivicLogin();
-        return;
-      }
       
       // Find the wallet adapter
       const wallet = wallets.find(w => w.adapter.name === walletName);
@@ -49,25 +42,8 @@ export default function ConnectPage() {
     }
   };
 
-  // Handle Civic Auth login
-  const handleCivicLogin = async () => {
-    try {
-      setError(null);
-      await civicLogin();
-    } catch (err) {
-      console.error('Error connecting with Civic Auth:', err);
-      setError(err instanceof Error ? err.message : 'Failed to connect with Civic Auth');
-    }
-  };
-
-  // Wallet options including Civic
+  // Wallet options
   const walletOptions = [
-    {
-      name: 'Civic',
-      icon: 'https://auth.civic.com/favicon.ico',
-      description: 'Sign in with email, Google, or social accounts',
-      available: true // Civic Auth is always available as it's web-based
-    },
     {
       name: 'Phantom',
       icon: 'https://play-lh.googleusercontent.com/obRvW02OTYLzJuvic1ZbVDVXLXzI0Vt_JGOjlxZ92XMdBF_i3kqU92u9SgHvJ5pySdM=w240-h480-rw',
@@ -79,12 +55,6 @@ export default function ConnectPage() {
       icon: 'https://solflare.com/logo.png',
       description: 'Connect to your Solflare Wallet',
       available: wallets.some(w => w.adapter.name.includes('Solflare'))
-    },
-    {
-      name: 'Backpack',
-      icon: 'https://play-lh.googleusercontent.com/EhgMPJGUYrA7-8PNfOdZgVGzxrOw4toX8tQXv-YzIvN6sAMYFunQ55MVo2SS_hLiNm8=w240-h480-rw',
-      description: 'Connect to your Backpack Wallet',
-      available: wallets.some(w => w.adapter.name.includes('Backpack'))
     },
     {
       name: 'Ledger',
@@ -104,9 +74,23 @@ export default function ConnectPage() {
           </p>
         </div>
 
-        {/* Civic Auth built-in button */}
-        <div className="mb-6 flex justify-center">
-          <UserButton />
+        {/* Civic Auth sign-in button */}
+        <div className="mb-6">
+          <div className="w-full rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-sky-500 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-sky-400">
+            <div className="flex items-center">
+              <img src="https://auth.civic.com/favicon.ico" alt="Civic" className="mr-3 h-8 w-8 rounded-full" />
+              <div className="flex-1">
+                <h3 className="flex items-center text-lg font-medium text-slate-900 dark:text-white">
+                  Civic Auth
+                  <span className="ml-2 rounded bg-cyan-100 px-2 py-0.5 text-xs font-medium text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300">
+                    Embedded Wallet
+                  </span>
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Sign in with email, Google, or social accounts</p>
+              </div>
+              <SignInButton className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" />
+            </div>
+          </div>
         </div>
 
         {/* Or separator */}
@@ -132,9 +116,9 @@ export default function ConnectPage() {
           </div>
         )}
 
-        {/* Wallet options (skipping Civic since we have the UserButton) */}
+        {/* Wallet options */}
         <div className="space-y-4">
-          {walletOptions.filter(wallet => wallet.name !== 'Civic').map((wallet) => {
+          {walletOptions.map((wallet) => {
             const isAvailable = wallet.available;
             const isSelected = selectedWallet === wallet.name;
             const isConnecting = connecting && isSelected;

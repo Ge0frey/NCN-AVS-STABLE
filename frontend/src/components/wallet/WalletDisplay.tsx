@@ -1,13 +1,21 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useUser, useWallet as useCivicWallet } from '@civic/auth-web3/react';
+import { useMemo } from 'react';
 
 export default function WalletDisplay() {
   const { publicKey, wallet } = useWallet();
   const { user } = useUser();
-  const { wallet: embeddedWallet } = useCivicWallet();
+  const { wallet: civicWallet } = useCivicWallet();
   
   // Get the public key from the embedded wallet if available
-  const embeddedWalletPublicKey = embeddedWallet ? embeddedWallet.getPublicKey() : null;
+  const embeddedWalletPublicKey = useMemo(() => {
+    try {
+      return civicWallet ? civicWallet.getPublicKey() : null;
+    } catch (e) {
+      console.error('Error getting embedded wallet public key:', e);
+      return null;
+    }
+  }, [civicWallet]);
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
