@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
 import { useStableFunds } from '../hooks/useStableFunds';
 import api from '../services/api';
+import WalletDisplay from '../components/wallet/WalletDisplay';
 
 // Define types for dashboard data
 interface Stablecoin {
@@ -177,7 +178,14 @@ export default function DashboardPage() {
 
   console.log('DashboardPage: Rendering content');
   return (
-    <div>
+    <div className="container mx-auto p-4">
+      <h1 className="mb-6 text-2xl font-bold text-white">Dashboard</h1>
+      
+      {/* Add WalletDisplay component */}
+      <div className="mb-6">
+        <WalletDisplay />
+      </div>
+      
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold md:text-3xl">Dashboard</h1>
         <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
