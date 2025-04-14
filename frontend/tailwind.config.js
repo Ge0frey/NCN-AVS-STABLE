@@ -45,6 +45,7 @@ export default {
         'slide-in': 'slideIn 0.3s ease-in-out',
         'fadeIn': 'fadeIn 0.4s ease-out',
         'scaleIn': 'scaleIn 0.3s ease-out',
+        'blob': 'blob 7s infinite',
       },
       keyframes: {
         fadeIn: {
@@ -59,8 +60,26 @@ export default {
           '0%': { transform: 'scale(0.95)', opacity: '0' },
           '100%': { transform: 'scale(1)', opacity: '1' },
         },
+        blob: {
+          '0%': { transform: 'scale(1) translate(0px, 0px)' },
+          '33%': { transform: 'scale(1.1) translate(30px, -50px)' },
+          '66%': { transform: 'scale(0.9) translate(-20px, 20px)' },
+          '100%': { transform: 'scale(1) translate(0px, 0px)' },
+        },
       },
     },
   },
-  plugins: [],
+  plugins: [
+    function({ addUtilities }) {
+      const newUtilities = {
+        '.delay-2000': {
+          'animation-delay': '2s',
+        },
+        '.delay-4000': {
+          'animation-delay': '4s',
+        },
+      }
+      addUtilities(newUtilities)
+    }
+  ],
 } 
