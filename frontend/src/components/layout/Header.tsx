@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useWalletContext } from '../../context/WalletContext';
 import { useTheme } from '../../context/ThemeContext';
 import WalletButton from '../wallet/WalletButton';
+import WalletDisplay from '../wallet/WalletDisplay';
 import Logo from './Logo';
 
 interface HeaderProps {
@@ -147,6 +148,9 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               </svg>
             )}
           </button>
+
+          {/* User email display */}
+          <WalletDisplay />
 
           {/* Wallet connection */}
           <WalletButton />
