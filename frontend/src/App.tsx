@@ -10,7 +10,8 @@ import { CivicAuthProvider } from '@civic/auth-web3/react'
 import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
 import { PhantomWalletAdapter, SolflareWalletAdapter, LedgerWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
-import { clusterApiUrl, WalletAdapterNetwork } from '@solana/web3.js'
+import { clusterApiUrl } from '@solana/web3.js'
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
 import { useMemo } from 'react'
 
 // Import wallet adapter CSS
