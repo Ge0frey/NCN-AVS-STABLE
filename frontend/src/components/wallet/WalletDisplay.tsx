@@ -1,13 +1,20 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useUser } from '@civic/auth-web3/react';
-import { useState } from 'react';
+import { useCallback } from 'react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 export default function WalletDisplay() {
   // Regular Solana wallet
-  const { publicKey, wallet } = useWallet();
+  const { publicKey, wallet, select, connect } = useWallet();
+  const { setVisible } = useWalletModal();
   
   // Civic auth
   const { user } = useUser();
+  
+  // Open wallet modal to connect
+  const openWalletModal = useCallback(() => {
+    setVisible(true);
+  }, [setVisible]);
   
   // Extract user info safely
   const getUserEmail = () => {
@@ -77,9 +84,17 @@ export default function WalletDisplay() {
             </p>
           </div>
         ) : (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            No wallet connected
-          </p>
+          <div>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">
+              No wallet connected
+            </p>
+            <button 
+              onClick={openWalletModal}
+              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Connect Wallet
+            </button>
+          </div>
         )}
       </div>
     </div>
