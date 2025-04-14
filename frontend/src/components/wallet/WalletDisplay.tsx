@@ -1,21 +1,59 @@
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useUser, useWallet as useCivicWallet } from '@civic/auth-web3/react';
-import { useMemo } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 
 export default function WalletDisplay() {
   const { publicKey, wallet } = useWallet();
   const { user } = useUser();
-  const { wallet: civicWallet } = useCivicWallet();
+  const [isCivicWalletReady, setIsCivicWalletReady] = useState(false);
+  const [embeddedWalletPublicKey, setEmbeddedWalletPublicKey] = useState(null);
   
-  // Get the public key from the embedded wallet if available
-  const embeddedWalletPublicKey = useMemo(() => {
+  // Use a safer approach to interact with the Civic wallet
+  useEffect(() => {
+    // Wait a moment for the wallet to initialize
+    const timer = setTimeout(() => {
+      try {
+        const civicWalletResult = useCivicWallet();
+        
+        if (civicWalletResult && civicWalletResult.wallet) {
+          setIsCivicWalletReady(true);
+          
+          try {
+            if (typeof civicWalletResult.wallet.getPublicKey === 'function') {
+              const publicKey = civicWalletResult.wallet.getPublicKey();
+              setEmbeddedWalletPublicKey(publicKey);
+            }
+          } catch (e) {
+            console.error('Error getting embedded wallet public key:', e);
+          }
+        }
+      } catch (e) {
+        console.error('Error initializing Civic wallet:', e);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [user]); // Re-run when user changes
+
+  // Safely get user information
+  const getUserInfo = useMemo(() => {
+    if (!user) return null;
+    
     try {
-      return civicWallet ? civicWallet.getPublicKey() : null;
+      // Handle different user object structures
+      if (typeof user === 'object') {
+        return {
+          email: user?.email || '',
+          id: user?.id || user?.sub || '',
+          name: user?.name || '',
+        };
+      }
+      return null;
     } catch (e) {
-      console.error('Error getting embedded wallet public key:', e);
+      console.error('Error parsing user data:', e);
       return null;
     }
-  }, [civicWallet]);
+  }, [user]);
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -30,10 +68,10 @@ export default function WalletDisplay() {
             {user ? 'Authenticated' : 'Not authenticated'}
           </p>
         </div>
-        {user && (
+        {user && getUserInfo && (
           <div className="mt-1">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {user.email || user.id || 'Authenticated user'}
+              {getUserInfo.email || getUserInfo.id || 'Authenticated user'}
             </p>
           </div>
         )}
@@ -53,7 +91,7 @@ export default function WalletDisplay() {
           </div>
         ) : (
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            No embedded wallet available
+            {isCivicWalletReady ? 'No embedded wallet available' : 'Loading embedded wallet...'}
           </p>
         )}
       </div>
