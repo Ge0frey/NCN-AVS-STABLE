@@ -8,7 +8,7 @@ import { AppContextProvider } from './context/AppContext'
 import { Toaster } from 'react-hot-toast'
 import { CivicAuthProvider } from '@civic/auth-web3/react'
 import { ConnectionProvider, WalletProvider as SolanaWalletProvider } from '@solana/wallet-adapter-react'
-import { SolflareWalletAdapter, LedgerWalletAdapter } from '@solana/wallet-adapter-wallets'
+import { SolflareWalletAdapter, LedgerWalletAdapter, PhantomWalletAdapter } from '@solana/wallet-adapter-wallets'
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui'
 import { clusterApiUrl } from '@solana/web3.js'
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
@@ -39,13 +39,22 @@ function App() {
   const network = WalletAdapterNetwork.Devnet;
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
   
-  // IMPORTANT: Removed PhantomWalletAdapter as it's auto-registered by Civic Auth
+  // Include PhantomWalletAdapter to ensure it's available both for Civic and direct connection
   const wallets = useMemo(
     () => [
-      // No PhantomWalletAdapter - Civic Auth registers it automatically
+      new PhantomWalletAdapter(), // Include Phantom in case Civic doesn't register it
       new SolflareWalletAdapter(),
       new LedgerWalletAdapter()
     ],
+    []
+  );
+
+  // Wallet modal configuration to ensure it always shows all wallets including the embedded one
+  const walletModalProps = useMemo(
+    () => ({
+      featuredWallets: 5, // Show more wallets in the featured section
+      showAllWallets: true, // Always show all available wallets in the modal
+    }),
     []
   );
 
@@ -79,7 +88,7 @@ function App() {
         >
           {/* Then add the Solana wallet providers, which will work with Civic's embedded wallet */}
           <SolanaWalletProvider wallets={wallets} autoConnect>
-            <WalletModalProvider>
+            <WalletModalProvider {...walletModalProps}>
               <ThemeProvider>
                 <WalletProvider>
                   <AppContextProvider>

@@ -451,25 +451,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const contextValue: WalletContextProps = {
-    ...wallet,
-    connection,
-    network,
-    balance,
-    isLoading,
-    isInitialized,
-    setNetwork,
-    refreshBalance,
-    jitoClient,
-    isJitoEnabled,
-    setJitoEnabled,
-    fetchJitoData,
-    stakeToVault,
-    unstakeFromVault,
-  };
-
+  // Then return the context value with all required methods
   return (
-    <WalletContext.Provider value={contextValue}>
+    <WalletContext.Provider
+      value={{
+        ...wallet,
+        connection,
+        network,
+        balance,
+        isLoading,
+        isInitialized,
+        setNetwork,
+        refreshBalance,
+        jitoClient,
+        isJitoEnabled,
+        setJitoEnabled,
+        fetchJitoData,
+        stakeToVault,
+        unstakeFromVault
+      }}
+    >
       {children}
     </WalletContext.Provider>
   );

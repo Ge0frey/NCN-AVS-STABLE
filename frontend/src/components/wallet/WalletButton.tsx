@@ -1,20 +1,22 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../../context/WalletContext';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 
 export default function WalletButton() {
   const { connected, publicKey, connecting, disconnect } = useWalletContext();
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
+  const { setVisible } = useWalletModal();
 
   // Format wallet address for display
   const formatAddress = (address: string) => {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
   };
 
-  // Handle connect button click
+  // Handle connect button click - open wallet modal directly
   const handleConnectClick = () => {
-    navigate('/connect');
+    setVisible(true);
   };
 
   // Handle disconnect
