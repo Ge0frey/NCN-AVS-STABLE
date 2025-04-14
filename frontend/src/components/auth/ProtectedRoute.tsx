@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, memo } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useWalletContext } from '../../context/WalletContext';
+import { useUser } from '@civic/auth-web3/react';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -19,13 +20,20 @@ const ProtectedRoute = memo(function ProtectedRoute({ children }: ProtectedRoute
   logDebug('ProtectedRoute: Rendering');
   
   const location = useLocation();
-  const { connected, isInitialized, isLoading } = useWalletContext();
+  const { connected, isInitialized, isLoading: walletLoading } = useWalletContext();
+  const { user, isLoading: civicLoading } = useUser();
+  
+  // User is authenticated if either wallet is connected or Civic Auth user exists
+  const isUserAuthenticated = connected || !!user;
+  const isLoading = walletLoading || civicLoading;
   
   logDebug('ProtectedRoute: State', { 
     pathname: location.pathname,
     connected, 
+    hasUser: !!user,
+    isUserAuthenticated,
     isInitialized, 
-    isLoading 
+    isLoading: isLoading
   });
 
   useEffect(() => {
@@ -45,8 +53,8 @@ const ProtectedRoute = memo(function ProtectedRoute({ children }: ProtectedRoute
     );
   }
 
-  // Redirect to connect page if wallet is not connected
-  if (!connected) {
+  // Redirect to connect page if not authenticated
+  if (!isUserAuthenticated) {
     logDebug('ProtectedRoute: Redirecting to connect page');
     return <Navigate to="/connect" replace state={{ from: location }} />;
   }
