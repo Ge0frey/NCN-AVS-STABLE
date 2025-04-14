@@ -179,18 +179,14 @@ export default function DashboardPage() {
   console.log('DashboardPage: Rendering content');
   return (
     <div className="container mx-auto p-4">
-      <h1 className="mb-6 text-2xl font-bold text-white">Dashboard</h1>
-      
-      {/* Add WalletDisplay component */}
-      <div className="mb-6">
-        <WalletDisplay />
-      </div>
-      
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold md:text-3xl">Dashboard</h1>
-        <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
-          <span className={`h-2 w-2 rounded-full ${dashboardData.networkStatus === 'Healthy' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-          <span>Network: {dashboardData.networkStatus}</span>
+        <div className="flex items-center space-x-4">
+          <WalletDisplay />
+          <div className="flex items-center space-x-2 text-sm text-slate-500 dark:text-slate-400">
+            <span className={`h-2 w-2 rounded-full ${dashboardData.networkStatus === 'Healthy' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+            <span>Network: {dashboardData.networkStatus}</span>
+          </div>
         </div>
       </div>
 
