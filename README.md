@@ -1,4 +1,3 @@
-# DEMO VIDEO: https://youtu.be/XjkXvFRxpNE
 ## Access platform from - https://stablefunds-ncns.vercel.app/
 
 # STABLE-FUNDS Platform
