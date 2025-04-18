@@ -129,7 +129,7 @@ export default function ConnectPage() {
         {/* Small extra branding element */}
         <div className="mt-6 text-center">
           <p className="text-xs text-slate-500">
-            Powered by <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 font-medium">Stable-Funds</span> Technology
+            Powered by <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500 font-medium">Solana</span>
           </p>
         </div>
       </div>
