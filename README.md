@@ -17,7 +17,7 @@ STABLE-FUNDS is a decentralized finance (DeFi) platform built on Sonic that enab
 - **Liquidation Protection System**: Proactively protect positions from liquidation with automated monitoring and intervention
 - **Responsive UI**: Modern interface that works across desktop and mobile devices
 
-## NEW FEATURES (Added for Sonic Mobius Hackathon)
+## NEW FEATURES 
 
 ### 1. Smart Vaults - Automated Yield Strategies for Collateral
 
