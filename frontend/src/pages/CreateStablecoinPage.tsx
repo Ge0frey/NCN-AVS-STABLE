@@ -112,6 +112,7 @@ export default function CreateStablecoinPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [confettiPieces, setConfettiPieces] = useState(200);
+  const [isLoadingStablebonds, setIsLoadingStablebonds] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -159,7 +160,7 @@ export default function CreateStablecoinPage() {
   };
 
   // Handle collateral selection
-  const handleCollateralSelect = (collateralId: string) => {
+  const handleCollateralSelect = async (collateralId: string) => {
     const selectedCollateral = COLLATERAL_OPTIONS.find(option => option.id === collateralId);
     
     // Reset selected stablebond when changing collateral type
@@ -169,6 +170,21 @@ export default function CreateStablecoinPage() {
       collateralizationRatio: selectedCollateral?.recommendedRatio || 175,
       selectedStablebond: null
     }));
+
+    // If stablebond is selected, fetch available stablebonds
+    if (collateralId === 'stablebond') {
+      setIsLoadingStablebonds(true);
+      setErrorMessage(null);
+      
+      try {
+        await fetchStablebonds(3);
+      } catch (err) {
+        console.error("Failed to fetch stablebonds:", err);
+        setErrorMessage("Failed to fetch available stablebonds. Please try again later or select a different collateral type.");
+      } finally {
+        setIsLoadingStablebonds(false);
+      }
+    }
   };
 
   // Handle icon selection
@@ -532,11 +548,11 @@ export default function CreateStablecoinPage() {
               Select a Stablebond
             </h3>
             
-            {stablecoinsLoading ? (
+            {isLoadingStablebonds ? (
               <div className="flex flex-col items-center justify-center py-6">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-400"></div>
                 <span className="mt-3 text-sm text-slate-300">Loading available stablebonds...</span>
-                <p className="mt-2 text-xs text-slate-400">This may take a moment. We're trying to connect to the Etherfuse SDK.</p>
+                <p className="mt-2 text-xs text-slate-400">This may take a moment. We're fetching the latest stablebond data.</p>
               </div>
             ) : hookError ? (
               <div className="rounded-md bg-red-900/20 p-3 text-red-400 text-sm">
@@ -1054,6 +1070,17 @@ export default function CreateStablecoinPage() {
       </div>
     ) : null;
 
+    // Show loading state only when submitting
+    if (isSubmitting) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-sky-400"></div>
+          <p className="mt-4 text-lg font-medium text-slate-300">Creating your stablecoin...</p>
+          <p className="mt-2 text-sm text-slate-400">This may take a moment. Please don't close this window.</p>
+        </div>
+      );
+    }
+
     switch (currentStep) {
       case 0:
         return (
@@ -1087,25 +1114,6 @@ export default function CreateStablecoinPage() {
         return <div>Unknown step</div>;
     }
   };
-
-  // Render loading skeleton
-  if (stablecoinsLoading) {
-    console.log('DashboardPage: Rendering loading skeleton');
-    return (
-      <div className="animate-pulse">
-        <h1 className="mb-6 text-2xl font-bold md:text-3xl">Dashboard</h1>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-32 rounded-lg bg-slate-200 dark:bg-slate-700"></div>
-          ))}
-        </div>
-        <div className="mt-8 grid gap-6 md:grid-cols-2">
-          <div className="h-64 rounded-lg bg-slate-200 dark:bg-slate-700"></div>
-          <div className="h-64 rounded-lg bg-slate-200 dark:bg-slate-700"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -1212,7 +1220,7 @@ export default function CreateStablecoinPage() {
       </div>
 
       {/* Success Modal */}
-      {renderSuccessModal()}
+      {showSuccessModal && renderSuccessModal()}
     </div>
   );
 } 
