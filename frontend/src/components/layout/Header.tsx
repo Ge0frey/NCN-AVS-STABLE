@@ -4,6 +4,7 @@ import { useWalletContext } from '../../context/WalletContext';
 import { useTheme } from '../../context/ThemeContext';
 import WalletButton from '../wallet/WalletButton';
 import WalletDisplay from '../wallet/WalletDisplay';
+import CompressionToggle from '../CompressionToggle';
 import Logo from './Logo';
 
 interface HeaderProps {
@@ -12,7 +13,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
-  const { connected, balance, isLoading } = useWalletContext();
+  const { connected, balance, isLoading, compressionClient } = useWalletContext();
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
 
@@ -148,6 +149,9 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
               </svg>
             )}
           </button>
+
+          {/* ZK Compression toggle */}
+          {compressionClient && <CompressionToggle />}
 
           {/* User email display */}
           <WalletDisplay />
