@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWalletContext } from '../context/WalletContext';
+import { PublicKey } from '@solana/web3.js';
+import { createCompressedCollateralService } from '../services/compressed-collateral';
 
 // Define collateral options
 const COLLATERAL_OPTIONS = [
@@ -24,7 +26,7 @@ const COLLATERAL_OPTIONS = [
 
 export default function DepositCollateralPage() {
   const navigate = useNavigate();
-  const { balance, publicKey } = useWalletContext();
+  const { balance, publicKey, isCompressionEnabled, compressionClient } = useWalletContext();
   
   // Form state
   const [selectedCollateral, setSelectedCollateral] = useState('');
@@ -35,6 +37,22 @@ export default function DepositCollateralPage() {
     jitosol: 10.5,
     stablebond: 2500,
   });
+  const [useCompression, setUseCompression] = useState(false);
+  const [compressedCollateralService, setCompressedCollateralService] = useState<any>(null);
+
+  // Initialize compressed collateral service
+  useEffect(() => {
+    if (isCompressionEnabled && compressionClient && publicKey) {
+      const service = createCompressedCollateralService({
+        connected: true,
+        publicKey,
+        signTransaction: (window as any).solana?.signTransaction,
+        signAllTransactions: (window as any).solana?.signAllTransactions,
+      }, compressionClient);
+      
+      setCompressedCollateralService(service);
+    }
+  }, [isCompressionEnabled, compressionClient, publicKey]);
 
   // Get selected collateral details
   const collateralDetails = COLLATERAL_OPTIONS.find(option => option.id === selectedCollateral);
@@ -60,8 +78,26 @@ export default function DepositCollateralPage() {
     setIsSubmitting(true);
     
     try {
-      // In a real app, you would send the transaction to your API/blockchain here
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API call
+      const amountValue = parseFloat(amount);
+      
+      // Check if using compression
+      if (useCompression && isCompressionEnabled && compressedCollateralService) {
+        console.log('Using compressed collateral');
+        
+        // For hackathon, we simulate with a mock stablecoin config
+        // In a real implementation, this would be the actual stablecoin config address
+        const stablecoinConfig = new PublicKey('So11111111111111111111111111111111111111112');
+        
+        const signature = await compressedCollateralService.depositCollateral(
+          stablecoinConfig,
+          amountValue
+        );
+        
+        console.log('Deposited compressed collateral with signature:', signature);
+      } else {
+        // Regular deposit (simulated for hackathon)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
       
       setShowSuccessModal(true);
     } catch (error) {
@@ -104,6 +140,11 @@ export default function DepositCollateralPage() {
           <h3 className="mb-2 text-xl font-bold">Deposit Successful!</h3>
           <p className="mb-4 text-slate-600 dark:text-slate-300">
             You have successfully deposited {amount} {collateralDetails?.name} as collateral.
+            {useCompression && isCompressionEnabled && (
+              <span className="block mt-2 text-green-600 font-medium">
+                ✓ Using ZK Compression for 99.4% lower storage costs!
+              </span>
+            )}
           </p>
           <div className="flex justify-end">
             <button
@@ -248,6 +289,34 @@ export default function DepositCollateralPage() {
                       <span className="font-medium text-green-600 dark:text-green-400">{collateralDetails?.apy}%</span>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ZK Compression toggle */}
+              {isCompressionEnabled && (
+                <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="flex items-center cursor-pointer">
+                        <div className="mr-2">
+                          <input
+                            type="checkbox"
+                            checked={useCompression}
+                            onChange={(e) => setUseCompression(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="relative w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                        </div>
+                        <span className="font-medium">Use ZK Compression</span>
+                      </label>
+                    </div>
+                    <div className="text-green-600 text-sm font-medium">
+                      160x cheaper storage!
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-2">
+                    ZK Compression reduces collateral account storage costs by 99.4% while maintaining the same security and functionality.
+                  </p>
                 </div>
               )}
 
