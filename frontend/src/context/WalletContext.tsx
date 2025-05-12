@@ -6,6 +6,8 @@ import { Connection, PublicKey, clusterApiUrl, Transaction, TransactionInstructi
 // import { RestakingClient } from '@jito-foundation/restaking-sdk';
 import { RestakingClient } from '@jito-foundation/restaking-sdk';
 import api from '../services/api';
+import { createCompressionClient, CompressionClient } from '../services/compression-client';
+import { getCompressionEnabled, setCompressionEnabled as setCompressionEnabledStorage } from '../services/compression-config';
 
 // Mock RestakingClient for development
 // class RestakingClient {
@@ -32,6 +34,9 @@ interface WalletContextProps extends WalletContextState {
   fetchJitoData: () => Promise<void>;
   stakeToVault: (vaultAddress: string, amount: number, lockPeriod?: number) => Promise<{ success: boolean; signature: string }>;
   unstakeFromVault: (vaultAddress: string, amount: number) => Promise<{ success: boolean; signature: string }>;
+  compressionClient: CompressionClient | null;
+  isCompressionEnabled: boolean;
+  setCompressionEnabled: (enabled: boolean) => void;
 }
 
 const WalletContext = createContext<WalletContextProps | undefined>(undefined);
@@ -56,6 +61,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [jitoClient, setJitoClient] = useState<RestakingClient | null>(null);
   const [isJitoEnabled, setIsJitoEnabled] = useState<boolean>(false);
   const [connectionAttempts, setConnectionAttempts] = useState<number>(0);
+  
+  // Add compression state
+  const [compressionClient, setCompressionClient] = useState<CompressionClient | null>(null);
+  const [isCompressionEnabled, setIsCompressionEnabled] = useState<boolean>(getCompressionEnabled());
 
   logDebug('WalletProvider: State', {
     connected: wallet.connected,
@@ -65,6 +74,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     hasConnection: !!connection,
     balance,
     isJitoEnabled,
+    isCompressionEnabled,
     connectionAttempts
   });
 
@@ -136,6 +146,37 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [network, connectionAttempts]);
 
+  // Initialize compression client
+  useEffect(() => {
+    let isMounted = true;
+    
+    const initializeCompressionClient = async () => {
+      if (!connection || !isMounted || !isInitialized) return;
+      
+      try {
+        // Create compression client
+        const client = createCompressionClient(connection, wallet);
+        if (isMounted) {
+          setCompressionClient(client);
+          logDebug('Compression client created successfully');
+        }
+      } catch (error) {
+        console.error('Failed to initialize compression client:', error);
+        if (isMounted) {
+          setCompressionClient(null);
+        }
+      }
+    };
+    
+    if (connection && isInitialized) {
+      initializeCompressionClient();
+    }
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [connection, wallet, isInitialized]);
+
   // Initialize Jito client - with error handling to avoid blocking the app
   useEffect(() => {
     let isMounted = true;
@@ -200,58 +241,62 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, [connection]);
+  }, [connection, jitoClient]);
 
-  // Add method to manually enable Jito
-  const setJitoEnabled = (enabled: boolean) => {
-    if (enabled && connection && !jitoClient) {
-      // Create client if enabling and no client exists
+  // Fetch wallet balance whenever the connection, wallet, or network changes
+  useEffect(() => {
+    logDebug('WalletProvider: Setting up balance fetch effect');
+    
+    let isMounted = true;
+    let intervalId: NodeJS.Timeout;
+    
+    const fetchBalance = async () => {
+      if (!connection || !wallet.publicKey || !isMounted) return;
+      
       try {
-        const client = new RestakingClient(connection);
-        setJitoClient(client);
-        setIsJitoEnabled(true);
-        logDebug('Jito Restaking client manually initialized');
+        const walletBalance = await connection.getBalance(wallet.publicKey);
+        if (isMounted) {
+          setBalance(walletBalance / 1e9); // Convert lamports to SOL
+        }
       } catch (error) {
-        console.error('Failed to manually initialize Jito client:', error);
-        return false;
+        console.error('Failed to fetch balance:', error);
       }
-    } else {
-      // Simply update the enabled state
-      setIsJitoEnabled(enabled);
-    }
-    return true;
-  };
+    };
+    
+    fetchBalance();
+    
+    // Poll for balance updates every 10 seconds
+    intervalId = setInterval(fetchBalance, 10000);
+    
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+      logDebug('WalletProvider: Cleaning up balance fetch effect');
+    };
+  }, [connection, wallet.publicKey, network]);
 
-  // Update balance when wallet changes
   const refreshBalance = useCallback(async () => {
-    logDebug('WalletProvider: Refreshing balance');
-    if (!wallet.publicKey || !connection) {
-      setBalance(0);
-      return;
-    }
+    if (!connection || !wallet.publicKey) return;
     
     try {
-      setIsLoading(true);
-      const balance = await connection.getBalance(wallet.publicKey);
-      setBalance(balance / 10 ** 9); // Convert lamports to SOL
+      const walletBalance = await connection.getBalance(wallet.publicKey);
+      setBalance(walletBalance / 1e9); // Convert lamports to SOL
     } catch (error) {
-      console.error('Error fetching balance:', error);
-      setBalance(0);
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to refresh balance:', error);
     }
-  }, [wallet.publicKey, connection]);
+  }, [connection, wallet.publicKey]);
 
-  useEffect(() => {
-    logDebug('WalletProvider: Wallet connection changed');
-    if (wallet.connected) {
-      refreshBalance();
-    } else {
-      setBalance(0);
-    }
-  }, [wallet.connected, refreshBalance]);
+  const setJitoEnabled = (enabled: boolean) => {
+    setIsJitoEnabled(enabled);
+  };
+  
+  const setCompressionEnabled = (enabled: boolean) => {
+    setIsCompressionEnabled(enabled);
+    setCompressionEnabledStorage(enabled);
+  };
 
-  // Update fetchJitoData method
+  // Use these functions to interact with the Jito staking vaults
+  // Restore fetchJitoData method
   const fetchJitoData = async () => {
     if (!isJitoEnabled || !connection || !wallet.publicKey) {
       return;
@@ -451,26 +496,29 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Then return the context value with all required methods
+  // Construct the context value with all needed properties and methods
+  const contextValue: WalletContextProps = {
+    ...wallet, // Spread all wallet adapter properties
+    connection,
+    network,
+    balance,
+    isLoading,
+    isInitialized,
+    setNetwork,
+    refreshBalance,
+    jitoClient,
+    isJitoEnabled,
+    setJitoEnabled,
+    fetchJitoData,
+    stakeToVault, 
+    unstakeFromVault,
+    compressionClient,
+    isCompressionEnabled,
+    setCompressionEnabled
+  };
+
   return (
-    <WalletContext.Provider
-      value={{
-        ...wallet,
-        connection,
-        network,
-        balance,
-        isLoading,
-        isInitialized,
-        setNetwork,
-        refreshBalance,
-        jitoClient,
-        isJitoEnabled,
-        setJitoEnabled,
-        fetchJitoData,
-        stakeToVault,
-        unstakeFromVault
-      }}
-    >
+    <WalletContext.Provider value={contextValue}>
       {children}
     </WalletContext.Provider>
   );
@@ -478,10 +526,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
 export const useWalletContext = () => {
   const context = useContext(WalletContext);
-  
   if (context === undefined) {
     throw new Error('useWalletContext must be used within a WalletProvider');
   }
-  
   return context;
-} 
+}; 
