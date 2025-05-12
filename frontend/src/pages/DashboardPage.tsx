@@ -4,6 +4,8 @@ import { useWalletContext } from '../context/WalletContext';
 import { useStableFunds } from '../hooks/useStableFunds';
 import api from '../services/api';
 import WalletDisplay from '../components/wallet/WalletDisplay';
+import CompressionStatus from '../components/CompressionStatus';
+import CompressionStats from '../components/CompressionStats';
 
 // Define types for dashboard data
 interface Stablecoin {
@@ -36,7 +38,7 @@ export default function DashboardPage() {
   console.log('DashboardPage: Rendering');
   
   const navigate = useNavigate();
-  const { balance, publicKey, connected, isInitialized, isLoading } = useWalletContext();
+  const { balance, publicKey, connected, isInitialized, isLoading, isCompressionEnabled } = useWalletContext();
   const { userStablecoins, loading: stablecoinsLoading, fetchUserStablecoins } = useStableFunds();
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState(initialDashboardState);
@@ -186,6 +188,12 @@ export default function DashboardPage() {
           <span>Network: {dashboardData.networkStatus}</span>
         </div>
       </div>
+
+      {/* ZK Compression Status */}
+      {isCompressionEnabled && <CompressionStatus />}
+      
+      {/* ZK Compression Stats */}
+      {isCompressionEnabled && <CompressionStats />}
 
       {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
