@@ -189,11 +189,13 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ZK Compression Status */}
-      {isCompressionEnabled && <CompressionStatus />}
-      
-      {/* ZK Compression Stats */}
-      {isCompressionEnabled && <CompressionStats />}
+      {/* ZK Compression components in a section if enabled */}
+      {isCompressionEnabled && (
+        <section>
+          <CompressionStatus />
+          <CompressionStats />
+        </section>
+      )}
 
       {/* Summary Cards */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

@@ -151,7 +151,7 @@ export default function Header({ onMenuClick, showMenuButton }: HeaderProps) {
           </button>
 
           {/* ZK Compression toggle */}
-          {compressionClient && <CompressionToggle />}
+          {compressionClient && <div className="ml-4"><CompressionToggle /></div>}
 
           {/* User email display */}
           <WalletDisplay />
