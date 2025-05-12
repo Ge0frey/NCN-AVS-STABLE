@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useStableFunds } from '../hooks/useStableFunds';
+import { useWallet, WalletContextState } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletContext } from '../context/WalletContext';
+import { useStableFunds, UserStablecoin } from '../hooks/useStableFunds';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 import { logger } from '../services/logger';
 import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl, isValidTransactionSignature } from '../utils/transaction';
 import { toast } from 'react-toastify';
 import Confetti from 'react-confetti';
+import type { CompressionClient } from '../services/compression-client';
 
 // Add animation styles to the document
 if (typeof document !== 'undefined') {
@@ -84,8 +85,26 @@ const COLLATERAL_OPTIONS = [
 // Stablecoin Icons
 const STABLECOIN_ICONS = ['💵', '💰', '💎', '🔒', '🪙', '💸', '💲'];
 
+interface WalletSigner {
+  publicKey: PublicKey;
+  signTransaction: NonNullable<WalletContextState['signTransaction']>;
+  signAllTransactions: NonNullable<WalletContextState['signAllTransactions']>;
+}
+
 export default function CreateStablecoinPage() {
   const navigate = useNavigate();
+  const walletAdapter = useWallet();
+  const { balance, publicKey, connected, isInitialized, isLoading, isCompressionEnabled, compressionClient } = useWalletContext();
+  const { 
+    userStablecoins, 
+    loading: stablecoinsLoading, 
+    error: hookError,
+    stablebonds,
+    fetchStablebonds,
+    createStablecoin,
+    addFallbackStablecoin,
+    fetchUserStablecoins 
+  } = useStableFunds();
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -93,19 +112,6 @@ export default function CreateStablecoinPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [confettiPieces, setConfettiPieces] = useState(200);
-  
-  // Add these hooks
-  const { connected } = useWallet();
-  const { isCompressionEnabled, compressionClient } = useWalletContext();
-  const { 
-    loading, 
-    error: hookError, 
-    stablebonds, 
-    fetchStablebonds, 
-    createStablecoin,
-    addFallbackStablecoin,
-    fetchUserStablecoins
-  } = useStableFunds();
   
   // Form state
   const [formData, setFormData] = useState({
@@ -202,7 +208,12 @@ export default function CreateStablecoinPage() {
   // Submit the form
   const handleSubmit = async () => {
     if (!connected) {
-      setErrorMessage('Please connect your wallet first');
+      toast.error('Please connect your wallet first');
+      return;
+    }
+
+    if (!publicKey || !walletAdapter?.signTransaction || !walletAdapter?.signAllTransactions) {
+      toast.error('Wallet connection is incomplete. Please reconnect your wallet.');
       return;
     }
     
@@ -217,48 +228,71 @@ export default function CreateStablecoinPage() {
       setErrorMessage(null);
       let transactionSignature: string;
       
-      // Convert collateral type to enum value
-      let collateralTypeValue: number = 0; // Default to SOL
-      if (formData.collateralType === 'stablebond') {
-        collateralTypeValue = 1; // Stablebond
-      } else if (formData.collateralType === 'mixed') {
-        collateralTypeValue = 2; // Mixed (e.g. USDC)
-      }
-      
       try {
         // Check if using compression and if it's enabled
-        if (formData.useCompression && isCompressionEnabled && compressionClient) {
+        if (formData.useCompression && isCompressionEnabled && compressionClient && walletAdapter) {
           // Create compressed stablecoin
-          logger.debug('Creating compressed stablecoin:', formData);
+          logger.info('STABLECOIN', 'Creating compressed stablecoin', formData);
           
           try {
+            const iconIndex = STABLECOIN_ICONS.indexOf(formData.icon);
+            if (iconIndex === -1) {
+              throw new Error('Invalid stablecoin icon');
+            }
+
             const { signature, mint } = await compressionClient.createCompressedStablecoin(
               formData.name,
               formData.symbol,
-              formData.description,
-              STABLECOIN_ICONS.indexOf(formData.icon),
-              collateralTypeValue,
+              formData.description || '',
+              iconIndex,
+              formData.collateralType === 'stablebond' ? 1 : formData.collateralType === 'mixed' ? 2 : 0,
               formData.collateralizationRatio * 100 // Convert to basis points
             );
             
             transactionSignature = signature;
-            logger.debug(`Compressed stablecoin created with signature: ${signature}, mint: ${mint.toBase58()}`);
+            logger.info('STABLECOIN', 'Compressed stablecoin created', { signature, mint: mint.toBase58() });
             setTxSignature(signature);
+            
+            // Add a fallback stablecoin for UI purposes
+            await addFallbackStablecoin({
+              id: mint.toBase58(),
+              name: formData.name,
+              symbol: formData.symbol,
+              description: formData.description || '',
+              icon: formData.icon,
+              totalSupply: formData.initialSupply,
+              marketCap: formData.initialSupply,
+              collateralRatio: formData.collateralizationRatio,
+              collateralType: formData.collateralType,
+              price: 1,
+              balance: formData.initialSupply,
+              isOwned: true,
+              createdAt: Date.now(),
+            });
           } catch (compressionError) {
-            logger.error('Error creating compressed stablecoin:', compressionError);
+            logger.error('STABLECOIN', 'Error creating compressed stablecoin', compressionError);
             throw compressionError;
           }
         } else {
           // Create regular stablecoin using existing mechanism
           // Prepare parameters based on selected collateral type
+          const iconIndex = STABLECOIN_ICONS.indexOf(formData.icon);
+          if (iconIndex === -1) {
+            throw new Error('Invalid stablecoin icon');
+          }
+
           const params: StablecoinParams = {
             name: formData.name,
             symbol: formData.symbol,
-            description: formData.description,
-            iconIndex: STABLECOIN_ICONS.indexOf(formData.icon),
-            collateralType: collateralTypeValue,
+            description: formData.description || '',
+            iconIndex,
+            collateralType: formData.collateralType === 'stablebond' 
+              ? 'Stablebond'
+              : formData.collateralType === 'mixed' 
+                ? 'USDC'
+                : 'SOL',
             collateralizationRatio: formData.collateralizationRatio * 100, // Convert to basis points
-            initialSupply: BigInt(formData.initialSupply) * BigInt(1000000), // Convert to lamports/smallest units
+            initialSupply: formData.initialSupply * 1000000, // Convert to smallest units
           };
           
           // Add stablebond mint if selected
@@ -266,28 +300,36 @@ export default function CreateStablecoinPage() {
             params.stablebondMint = formData.selectedStablebond.bondMint;
           }
           
-          logger.debug('Creating stablecoin with params:', params);
+          logger.info('STABLECOIN', 'Creating stablecoin', params);
           
-          transactionSignature = await createStablecoin(params);
-          logger.debug(`Stablecoin created with signature: ${transactionSignature}`);
+          const result = await createStablecoin(params);
+          transactionSignature = result.signature;
+          logger.info('STABLECOIN', 'Stablecoin created', { signature: transactionSignature });
           setTxSignature(transactionSignature);
         }
       } catch (blockchainError) {
         // If blockchain tx fails but we're in development mode, use a mock
         if (process.env.NODE_ENV === 'development') {
-          console.warn('Using mock transaction in development mode');
+          logger.warning('STABLECOIN', 'Using mock transaction in development mode');
           // Use a mock transaction signature for development/demo purposes
           transactionSignature = generateMockTransactionSignature();
           setTxSignature(transactionSignature);
           
           // Add a fallback stablecoin for UI purposes
           await addFallbackStablecoin({
+            id: transactionSignature,
             name: formData.name,
             symbol: formData.symbol,
-            mint: new PublicKey(transactionSignature), // Use the mock signature as a "mint" for display purposes
-            description: formData.description,
-            icon: STABLECOIN_ICONS.indexOf(formData.icon),
-            isCompressed: formData.useCompression,
+            description: formData.description || '',
+            icon: formData.icon,
+            totalSupply: formData.initialSupply,
+            marketCap: formData.initialSupply,
+            collateralRatio: formData.collateralizationRatio,
+            collateralType: formData.collateralType,
+            price: 1,
+            balance: formData.initialSupply,
+            isOwned: true,
+            createdAt: Date.now(),
           });
         } else {
           // In production, throw the error
@@ -300,7 +342,8 @@ export default function CreateStablecoinPage() {
       fetchUserStablecoins(); // Refresh stablecoins list
     } catch (error) {
       console.error('Error creating stablecoin:', error);
-      setErrorMessage(`Failed to create stablecoin: ${(error as Error).message}`);
+      logger.error('STABLECOIN', 'Failed to create stablecoin', error);
+      setErrorMessage(`Failed to create stablecoin: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -489,7 +532,7 @@ export default function CreateStablecoinPage() {
               Select a Stablebond
             </h3>
             
-            {loading ? (
+            {stablecoinsLoading ? (
               <div className="flex flex-col items-center justify-center py-6">
                 <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-sky-400"></div>
                 <span className="mt-3 text-sm text-slate-300">Loading available stablebonds...</span>
@@ -1045,6 +1088,25 @@ export default function CreateStablecoinPage() {
     }
   };
 
+  // Render loading skeleton
+  if (stablecoinsLoading) {
+    console.log('DashboardPage: Rendering loading skeleton');
+    return (
+      <div className="animate-pulse">
+        <h1 className="mb-6 text-2xl font-bold md:text-3xl">Dashboard</h1>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-32 rounded-lg bg-slate-200 dark:bg-slate-700"></div>
+          ))}
+        </div>
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <div className="h-64 rounded-lg bg-slate-200 dark:bg-slate-700"></div>
+          <div className="h-64 rounded-lg bg-slate-200 dark:bg-slate-700"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -1138,7 +1200,7 @@ export default function CreateStablecoinPage() {
               <>
                 <svg className="mr-2 h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 Creating...
               </>
