@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useStableFunds } from '../hooks/useStableFunds';
 import { PublicKey } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletContext } from '../context/WalletContext';
 import StableFundsClient, { StablecoinParams, StablebondData } from '../services/anchor-client';
 import { logger } from '../services/logger';
 import { generateMockTransactionSignature, formatTransactionSignature, getTransactionExplorerUrl, isValidTransactionSignature } from '../utils/transaction';
@@ -80,6 +81,9 @@ const COLLATERAL_OPTIONS = [
   }
 ];
 
+// Stablecoin Icons
+const STABLECOIN_ICONS = ['💵', '💰', '💎', '🔒', '🪙', '💸', '💲'];
+
 export default function CreateStablecoinPage() {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
@@ -92,6 +96,7 @@ export default function CreateStablecoinPage() {
   
   // Add these hooks
   const { connected } = useWallet();
+  const { isCompressionEnabled, compressionClient } = useWalletContext();
   const { 
     loading, 
     error: hookError, 
@@ -112,6 +117,7 @@ export default function CreateStablecoinPage() {
     initialSupply: 1000,
     icon: '💵',
     selectedStablebond: null as { bondMint: PublicKey, name: string, symbol: string } | null,
+    useCompression: false,
   });
 
   // Fetch stablebonds when collateral type is selected
@@ -164,6 +170,11 @@ export default function CreateStablecoinPage() {
     setFormData(prev => ({ ...prev, icon }));
   };
 
+  // Handle compression toggle
+  const handleCompressionToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({ ...prev, useCompression: e.target.checked }));
+  };
+
   // Navigate to next step
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) {
@@ -201,159 +212,95 @@ export default function CreateStablecoinPage() {
       return;
     }
     
-    // Validate that a collateral type is selected
-    if (!formData.collateralType) {
-      setErrorMessage('Please select a collateral type');
-      return;
-    }
-    
-    // Validate name and symbol
-    if (!formData.name.trim()) {
-      setErrorMessage('Please enter a name for your stablecoin');
-      return;
-    }
-    
-    if (!formData.symbol.trim()) {
-      setErrorMessage('Please enter a symbol for your stablecoin');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setErrorMessage(null);
-    
-    // Generate a unique identifier for the stablecoin
-    const uniqueId = `stablecoin-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-    
-    logger.info('STABLECOIN_CREATION', 'Stablecoin creation started', {
-      name: formData.name,
-      symbol: formData.symbol,
-      collateralType: formData.collateralType,
-      collateralizationRatio: formData.collateralizationRatio,
-      initialSupply: formData.initialSupply,
-      uniqueId
-    });
-    
     try {
-      console.log("Submitting stablecoin creation with data:", formData);
+      setIsSubmitting(true);
+      setErrorMessage(null);
+      let transactionSignature: string;
       
-      // Ensure the stablebond mint is a valid PublicKey if selected
-      let stablebondMint: PublicKey | undefined = undefined;
-      if (formData.collateralType === 'stablebond' && formData.selectedStablebond) {
-        try {
-          stablebondMint = new PublicKey(formData.selectedStablebond.bondMint.toString());
-          console.log("Using stablebond mint:", stablebondMint.toString());
-        } catch (error) {
-          console.error("Invalid stablebond mint:", error);
-          // Don't show the error to the user, just log it for debugging
-          console.error('Error with stablebond mint:', error);
-          logger.error('STABLECOIN_CREATION', 'Invalid stablebond mint', {
-            error: error instanceof Error ? error.message : String(error),
-            bondMint: formData.selectedStablebond.bondMint.toString()
+      // Convert collateral type to enum value
+      let collateralTypeValue: number = 0; // Default to SOL
+      if (formData.collateralType === 'stablebond') {
+        collateralTypeValue = 1; // Stablebond
+      } else if (formData.collateralType === 'mixed') {
+        collateralTypeValue = 2; // Mixed (e.g. USDC)
+      }
+      
+      try {
+        // Check if using compression and if it's enabled
+        if (formData.useCompression && isCompressionEnabled && compressionClient) {
+          // Create compressed stablecoin
+          logger.debug('Creating compressed stablecoin:', formData);
+          
+          try {
+            const { signature, mint } = await compressionClient.createCompressedStablecoin(
+              formData.name,
+              formData.symbol,
+              formData.description,
+              STABLECOIN_ICONS.indexOf(formData.icon),
+              collateralTypeValue,
+              formData.collateralizationRatio * 100 // Convert to basis points
+            );
+            
+            transactionSignature = signature;
+            logger.debug(`Compressed stablecoin created with signature: ${signature}, mint: ${mint.toBase58()}`);
+            setTxSignature(signature);
+          } catch (compressionError) {
+            logger.error('Error creating compressed stablecoin:', compressionError);
+            throw compressionError;
+          }
+        } else {
+          // Create regular stablecoin using existing mechanism
+          // Prepare parameters based on selected collateral type
+          const params: StablecoinParams = {
+            name: formData.name,
+            symbol: formData.symbol,
+            description: formData.description,
+            iconIndex: STABLECOIN_ICONS.indexOf(formData.icon),
+            collateralType: collateralTypeValue,
+            collateralizationRatio: formData.collateralizationRatio * 100, // Convert to basis points
+            initialSupply: BigInt(formData.initialSupply) * BigInt(1000000), // Convert to lamports/smallest units
+          };
+          
+          // Add stablebond mint if selected
+          if (formData.collateralType === 'stablebond' && formData.selectedStablebond) {
+            params.stablebondMint = formData.selectedStablebond.bondMint;
+          }
+          
+          logger.debug('Creating stablecoin with params:', params);
+          
+          transactionSignature = await createStablecoin(params);
+          logger.debug(`Stablecoin created with signature: ${transactionSignature}`);
+          setTxSignature(transactionSignature);
+        }
+      } catch (blockchainError) {
+        // If blockchain tx fails but we're in development mode, use a mock
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Using mock transaction in development mode');
+          // Use a mock transaction signature for development/demo purposes
+          transactionSignature = generateMockTransactionSignature();
+          setTxSignature(transactionSignature);
+          
+          // Add a fallback stablecoin for UI purposes
+          await addFallbackStablecoin({
+            name: formData.name,
+            symbol: formData.symbol,
+            mint: new PublicKey(transactionSignature), // Use the mock signature as a "mint" for display purposes
+            description: formData.description,
+            icon: STABLECOIN_ICONS.indexOf(formData.icon),
+            isCompressed: formData.useCompression,
           });
+        } else {
+          // In production, throw the error
+          throw blockchainError;
         }
       }
       
-      // Prepare the parameters for creating a stablecoin
-      const params = {
-        name: formData.name,
-        symbol: formData.symbol,
-        description: formData.description,
-        iconIndex: parseInt(formData.icon.codePointAt(0)?.toString() || '0') % 10, // Convert emoji to number
-        collateralType: formData.collateralType === 'stablebond' ? 'Stablebond' : 
-                        formData.collateralType === 'jitosol' ? 'SOL' : 'USDC',
-        stablebondMint: stablebondMint,
-        collateralizationRatio: formData.collateralizationRatio,
-        initialSupply: formData.initialSupply,
-      } as StablecoinParams;
-      
-      console.log("Calling createStablecoin with params:", params);
-      
-      // Call the createStablecoin function from our hook
-      const { signature } = await createStablecoin(params);
-      
-      // Store the transaction signature for display
-      setTxSignature(signature);
-      
-      // Also store a flag indicating this is a real transaction
-      sessionStorage.setItem(`tx-${signature}`, 'real');
-      
-      // Log the successful transaction
-      logger.stablecoinOperation('CREATION', true, {
-        stablecoin: {
-          name: formData.name,
-          symbol: formData.symbol,
-          collateralType: params.collateralType,
-          initialSupply: formData.initialSupply,
-        },
-        transactionSignature: signature,
-        method: 'blockchain',
-        uniqueId
-      });
-      
-      // Immediately refresh the user's stablecoins list
-      fetchUserStablecoins();
-      
-      // Show success modal
+      // Show confetti and success modal
       showSuccessModalAndClearErrors();
+      fetchUserStablecoins(); // Refresh stablecoins list
     } catch (error) {
-      // Log the error for debugging purposes
       console.error('Error creating stablecoin:', error);
-      
-      // Log the error to our tracking system
-      logger.stablecoinOperation('CREATION', false, {
-        stablecoin: {
-          name: formData.name,
-          symbol: formData.symbol,
-          collateralType: formData.collateralType,
-          initialSupply: formData.initialSupply,
-        },
-        method: 'blockchain',
-        uniqueId
-      }, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      
-      const fallbackStablecoin = {
-        id: uniqueId,
-        name: formData.name,
-        symbol: formData.symbol,
-        description: formData.description,
-        icon: formData.icon,
-        totalSupply: formData.initialSupply,
-        marketCap: formData.initialSupply,
-        collateralRatio: formData.collateralizationRatio,
-        collateralType: formData.collateralType === 'stablebond' ? 'Stablebond' : 
-                        formData.collateralType === 'jitosol' ? 'SOL' : 'USDC',
-        price: 1.00, // Stablecoins are pegged to $1
-        balance: formData.initialSupply,
-        isOwned: true,
-        createdAt: Date.now(),
-      };
-      
-      
-      addFallbackStablecoin(fallbackStablecoin);
-      
-      const fallbackEvent = new CustomEvent('fallback-stablecoin-created', { 
-        detail: { stablecoin: fallbackStablecoin } 
-      });
-      window.dispatchEvent(fallbackEvent);
-      
-      logger.stablecoinOperation('CREATION_FALLBACK', true, {
-        stablecoin: fallbackStablecoin,
-        method: 'fallback',
-        uniqueId,
-        originalError: error instanceof Error ? error.message : String(error)
-      });
-      
-      const mockSignature = generateMockTransactionSignature();
-      setTxSignature(mockSignature);
-      
-      sessionStorage.setItem(`tx-${mockSignature}`, 'mock');
-      
-      fetchUserStablecoins();
-      
-      showSuccessModalAndClearErrors();
+      setErrorMessage(`Failed to create stablecoin: ${(error as Error).message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -729,69 +676,80 @@ export default function CreateStablecoinPage() {
     const selectedCollateral = COLLATERAL_OPTIONS.find(option => option.id === formData.collateralType);
     
     return (
-      <div className="space-y-6">
-        <p className="text-slate-600 dark:text-slate-300">
-          Review your stablecoin details before creating it. Once created, some properties cannot be changed.
-        </p>
+      <div className="animate-fadeIn mt-4">
+        <h2 className="text-xl font-semibold mb-6">Review Your Stablecoin</h2>
         
-        <div className="rounded-lg border border-slate-200 dark:border-slate-700">
-          <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-            <h3 className="text-lg font-medium">Basic Information</h3>
-          </div>
-          <div className="p-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Name</p>
-                <p className="font-medium">{formData.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Symbol</p>
-                <p className="font-medium">{formData.symbol}</p>
-              </div>
-              <div className="md:col-span-2">
-                <p className="text-sm text-slate-500 dark:text-slate-400">Description</p>
-                <p className="font-medium">{formData.description}</p>
-              </div>
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Icon</p>
-                <p className="text-2xl">{formData.icon}</p>
-              </div>
+        <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6 mb-8">
+          <div className="flex flex-col md:flex-row md:items-center mb-4">
+            <div className="text-4xl mb-4 md:mr-4 md:mb-0">
+              {formData.icon}
+            </div>
+            <div>
+              <h3 className="text-2xl font-semibold mb-1">{formData.name} ({formData.symbol})</h3>
+              <p className="text-slate-600 dark:text-slate-400 text-sm mb-2">{formData.description || 'No description provided'}</p>
             </div>
           </div>
           
-          <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-            <h3 className="text-lg font-medium">Collateral</h3>
-          </div>
-          <div className="p-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Type</p>
-                <p className="font-medium">{selectedCollateral?.name}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div>
+              <h4 className="text-sm uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">Collateral Details</h4>
+              <div className="mb-4">
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm">Collateral Type</span>
+                  <span className="font-medium">{selectedCollateral?.name || 'Not selected'}</span>
+                </div>
+                <div className="flex justify-between mb-1">
+                  <span className="text-sm">Collateralization Ratio</span>
+                  <span className="font-medium">{formData.collateralizationRatio}%</span>
+                </div>
+                {formData.collateralType === 'stablebond' && formData.selectedStablebond && (
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm">Selected Stablebond</span>
+                    <span className="font-medium">{formData.selectedStablebond.name} ({formData.selectedStablebond.symbol})</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-sm uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3">Supply Information</h4>
+              <div className="flex justify-between mb-1">
+                <span className="text-sm">Initial Supply</span>
+                <span className="font-medium">{formData.initialSupply.toLocaleString()} {formData.symbol}</span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span className="text-sm">Target Value</span>
+                <span className="font-medium">${formData.initialSupply.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between mb-1">
+                <span className="text-sm">Backing Collateral Value</span>
+                <span className="font-medium">${(formData.initialSupply * (formData.collateralizationRatio / 100)).toLocaleString()}</span>
               </div>
               
-              {formData.collateralType === 'stablebond' && formData.selectedStablebond && (
-                <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Selected Stablebond</p>
-                  <p className="font-medium">{formData.selectedStablebond.name} ({formData.selectedStablebond.symbol})</p>
+              {/* Add ZK Compression toggle */}
+              {isCompressionEnabled && (
+                <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="flex items-center cursor-pointer">
+                        <div className="mr-2">
+                          <input
+                            type="checkbox"
+                            checked={formData.useCompression}
+                            onChange={handleCompressionToggle}
+                            className="sr-only peer"
+                          />
+                          <div className="relative w-11 h-6 bg-gray-200 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-green-600"></div>
+                        </div>
+                        <span className="font-medium">Use ZK Compression</span>
+                      </label>
+                    </div>
+                  </div>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-2">
+                    ZK Compression reduces on-chain storage costs by up to 99% while maintaining the same security and functionality.
+                  </p>
                 </div>
               )}
-              
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Collateralization Ratio</p>
-                <p className="font-medium">{formData.collateralizationRatio}%</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="border-b border-t border-slate-200 p-4 dark:border-slate-700">
-            <h3 className="text-lg font-medium">Supply</h3>
-          </div>
-          <div className="p-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Initial Supply</p>
-                <p className="font-medium">{formData.initialSupply.toLocaleString()}</p>
-              </div>
             </div>
           </div>
         </div>
