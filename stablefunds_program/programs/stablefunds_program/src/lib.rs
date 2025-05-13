@@ -4,7 +4,7 @@ use anchor_spl::associated_token::AssociatedToken;
 use std::mem::size_of;
 
 // The program's ID
-declare_id!("97XJBATGaXqBSVRQYszL7pr4RP46Uv9KH6FzcLx3zgd8");
+declare_id!("8eHztpVrS6k1k7GeuHV2xgjioHiUKCwmV4P3EbNTLeWo");
 
 // Other modules are included here
 pub mod smart_vaults;

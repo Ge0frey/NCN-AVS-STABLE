@@ -9,7 +9,7 @@ skip-lint = false
 stablefunds_program = "97XJBATGaXqBSVRQYszL7pr4RP46Uv9KH6FzcLx3zgd8"
 
 [programs.testnet]
-stablefunds_program = "97XJBATGaXqBSVRQYszL7pr4RP46Uv9KH6FzcLx3zgd8"
+stablefunds_program = "8eHztpVrS6k1k7GeuHV2xgjioHiUKCwmV4P3EbNTLeWo"
 
 [registry]
 url = "https://api.apr.dev"
@@ -19,7 +19,7 @@ cluster = "https://api.devnet.solana.com"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 build = "anchor build"
 deploy = "anchor deploy"
 generate-idl = "anchor build && cp target/idl/stablefunds_program.json ../frontend/src/services/anchor-client/idl.json"
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
