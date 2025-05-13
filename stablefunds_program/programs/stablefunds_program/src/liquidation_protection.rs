@@ -129,7 +129,7 @@ pub struct ExecuteProtectionAction<'info> {
         init,
         payer = authority,
         space = 8 + 32 + 8 + 1 + 8 + 2 + 2 + 1 + 1,
-        seeds = [b"protection-action", protection_account.key().as_ref(), &Clock::get()?.unix_timestamp.to_le_bytes()],
+        seeds = [b"protection-action", protection_account.key().as_ref()],
         bump
     )]
     pub action_record: Account<'info, ProtectionActionRecord>,
